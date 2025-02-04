@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 
 from contextlib import suppress
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Set
 
 from discord import Member, Role
 from discord.ext.commands import (
@@ -20,23 +20,40 @@ if TYPE_CHECKING:
     from core.context import Context
 
 class GoodRole(Converter):
+    DANGEROUS_PERMISSIONS: Set[str] = {
+        "administrator",
+        "kick_members",
+        "ban_members", 
+        "manage_guild",
+        "manage_roles",
+        "manage_channels",
+        "manage_expressions",
+        "manage_webhooks",
+        "manage_nicknames",
+        "mention_everyone"
+    }
+
+    @staticmethod
+    def dangerous(role: Role) -> bool:
+        return any(
+            getattr(role.permissions, perm, False)
+            for perm in GoodRole.DANGEROUS_PERMISSIONS
+        )
+
     async def convert(self, ctx: Context, argument: str) -> discord.Role:
         try:
             role = await RoleConverter().convert(ctx, argument)
         except BadArgument:
             role = discord.utils.get(ctx.guild.roles, name=argument)
 
+        if not role:
+            raise BadArgument(f"No role called **{argument}** found!")
+
         if ctx.author.id in ctx.bot.owner_ids or ctx.author.id == ctx.guild.owner_id:
             return role
 
-        if role is None:
-            raise BadArgument(f"No role called **{argument}** found!")
-
-        if role.position >= ctx.guild.me.top_role.position:
-            raise BadArgument(f"{role.mention} is higher than my highest role!")
-
-        if role.position >= ctx.author.top_role.position:
-            raise BadArgument(f"{role.mention} is higher than your highest role!")
+        if role.position >= max(ctx.guild.me.top_role.position, ctx.author.top_role.position):
+            raise BadArgument(f"{role.mention} is higher than permitted in the role hierarchy!")
 
         return role
 

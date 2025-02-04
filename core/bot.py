@@ -39,6 +39,7 @@ from discord.ext.commands import (
 from core.database import Database, Settings
 from core.cache import cache
 from utils.computation import heavy_computation
+from utils.monitoring import PerformanceMonitoring
 
 from core.http import MonitoredHTTPClient
 from utils.prefix import getprefix
@@ -219,7 +220,7 @@ class Evict(commands.AutoShardedBot):
             log.error(f"Error in setup_hook: {e}", exc_info=True)
             raise
 
-    @trace_method()
+    PerformanceMonitoring().trace_method
     async def _init_services(self) -> None:
         """Initialize core services."""
         self.session = ClientSession(
@@ -228,8 +229,8 @@ class Evict(commands.AutoShardedBot):
         )
         self._http = MonitoredHTTPClient(self.http._HTTPClient__session, bot=self)
         
-        self.add_dynamic_items(DynamicRoleButton)
-        self.add_view(DeleteTicket())
+        # self.add_dynamic_items(DynamicRoleButton)
+        # self.add_view(DeleteTicket())
         
         self.database = await Database.connect()
         self.redis = await Redis.from_url()
@@ -237,13 +238,13 @@ class Evict(commands.AutoShardedBot):
         self.browser = BrowserHandler()
         await self.browser.init()
 
-    @trace_method()
+    PerformanceMonitoring().trace_method
     async def on_command(self, ctx: Context) -> None:
         """Custom on_command method that logs command usage."""
-        if not ctx.guild:
-            return
+        if not (ctx.guild and ctx.command):
+            if not ctx.guild:
+                return
 
-        if not ctx.command: 
             custom_command = await self.db.fetchrow(
                 """
                 SELECT word 
@@ -254,54 +255,59 @@ class Evict(commands.AutoShardedBot):
                 ctx.invoked_with.lower()
             )
             
-            if custom_command:
-                ctx.command = type('CustomCommand', (), {
-                    'qualified_name': f"wordstats_{ctx.invoked_with}",
-                    'cog_name': "Utility"
-                })
-            else:
-                return 
+            if not custom_command:
+                return
+                
+            ctx.command = type('CustomCommand', (), {
+                'qualified_name': f"wordstats_{ctx.invoked_with}",
+                'cog_name': "Utility"
+            })
 
         await self._track_command_usage(ctx)
         
     async def _track_command_usage(self, ctx: Context) -> None:
         """Track command usage statistics."""
-        await self.db.execute(
-            """
-            INSERT INTO statistics.daily 
-                (guild_id, date, member_id, messages_sent)
-            VALUES 
-                ($1, CURRENT_DATE, $2, 0)
-            ON CONFLICT (guild_id, date, member_id) DO UPDATE SET 
-                messages_sent = statistics.daily.messages_sent
-            """,
-            ctx.guild.id,
-            ctx.author.id
-        )
-
-        await self.db.execute(
-            """
-            INSERT INTO invoke_history.commands 
-            (guild_id, user_id, command_name, category, timestamp)
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-            """,
-            ctx.guild.id,
-            ctx.author.id,
-            ctx.command.qualified_name,
-            ctx.command.cog_name or "No Category",
-        )
+        async with self.db.acquire() as conn:
+            async with conn.transaction():
+                await asyncio.gather(
+                    conn.execute(
+                        """
+                        INSERT INTO statistics.daily 
+                            (guild_id, date, member_id, messages_sent)
+                        VALUES 
+                            ($1, CURRENT_DATE, $2, 0)
+                        ON CONFLICT (guild_id, date, member_id) DO UPDATE SET 
+                            messages_sent = statistics.daily.messages_sent
+                        """,
+                        ctx.guild.id,
+                        ctx.author.id
+                    ),
+                    conn.execute(
+                        """
+                        INSERT INTO invoke_history.commands 
+                        (guild_id, user_id, command_name, category, timestamp)
+                        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                        """,
+                        ctx.guild.id,
+                        ctx.author.id,
+                        ctx.command.qualified_name,
+                        ctx.command.cog_name or "No Category",
+                    )
+                )
 
         start_time = time.time()
         command_name = ctx.command.qualified_name
         
         try:
             log.info(
-                "%s (%s) used %s in %s (%s)",
-                ctx.author.name,
-                ctx.author.id,
-                ctx.command.qualified_name,
-                ctx.guild.name,
-                ctx.guild.id,
+                "Command execution: %s",
+                {
+                    "user": ctx.author.name,
+                    "user_id": ctx.author.id,
+                    "command": command_name,
+                    "guild": ctx.guild.name,
+                    "guild_id": ctx.guild.id
+                }
             )
         finally:
             elapsed = time.time() - start_time
@@ -341,19 +347,31 @@ class Evict(commands.AutoShardedBot):
         self.system_stats = defaultdict(list)
         self.process = psutil.Process()
         self._last_system_check = 0
-        self.command_stats = defaultdict(lambda: {'calls': 0, 'total_time': 0})
+        self.command_stats = defaultdict(lambda: {
+            'calls': 0,
+            'total_time': 0.0,
+            'last_reset': time.time()
+        })
 
     async def _init_voice_system(self) -> None:
         """Initialize voice system and backup manager."""
-        self.voice_update_task = self.loop.create_task(self.update_voice_times())
+        self.voice_update_task = self.loop.create_task(
+            self.update_voice_times(),
+            name="voice_update_task"
+        )
         self.backup_manager = BackupManager(self)
-        self.backup_task = self.loop.create_task(self._backup_task())
+        self.backup_task = self.loop.create_task(
+            self._backup_task(),
+            name="backup_task"
+        )
         
-        for guild in self.guilds:
-            for vc in guild.voice_channels:
-                for member in vc.members:
-                    if not member.bot:
-                        self.voice_join_times[member.id] = time.time()
+        self.voice_join_times.update({
+            member.id: time.time()
+            for guild in self.guilds
+            for vc in guild.voice_channels
+            for member in vc.members
+            if not member.bot
+        })
 
     async def connect_nodes(self) -> None:
         """Connect to Lavalink nodes."""

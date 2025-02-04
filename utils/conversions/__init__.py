@@ -72,6 +72,12 @@ class StrictMember(MemberConverter):
 
 
 class Duration(Converter[timedelta]):
+    """
+    Converts a string duration into a timedelta object.
+    Supports units: weeks, days, hours, minutes, seconds
+    """
+    __slots__ = ('min', 'max', 'units')
+
     def __init__(
         self: "Duration",
         min: Optional[timedelta] = None,
