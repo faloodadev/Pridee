@@ -65,20 +65,31 @@ class Approve(discord.ui.View):
         self.user = user
         self.value = None
 
-    @discord.ui.button(label="Approve", style=discord.ButtonStyle.green)
+    @discord.ui.button(style=discord.ButtonStyle.green)
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
-        
+        button.label = self.ctx.bot.get_text("system.confirm.confirmation.buttons.approve")
         if interaction.user != self.user:
-            await interaction.warn(f"Only **{self.user}** can respond to this!")
+            await interaction.warn(
+                self.ctx.bot.get_text(
+                    "system.confirm.ONLY_USER_RESPOND",
+                    user=self.user
+                )
+            )
             return
         
         self.value = True
         self.stop()
 
-    @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger)
+    @discord.ui.button(style=discord.ButtonStyle.danger)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        button.label = self.ctx.bot.get_text("system.confirm.confirmation.buttons.decline")
         if interaction.user != self.user:
-            await interaction.warn(f"Only **{self.user}** can respond to this!")
+            await interaction.warn(
+                self.ctx.bot.get_text(
+                    "system.confirm.ONLY_USER_RESPOND",
+                    user=self.user
+                )
+            )
             return
         
         self.value = False
@@ -92,21 +103,15 @@ class Confirmation(View):
         self.ctx = ctx
         self.value = None
 
-    @button(label="Approve", style=ButtonStyle.green)
-    async def approve(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
+    @button(style=ButtonStyle.green)
+    async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
+        button.label = self.ctx.bot.get_text("system.confirm.confirmation.buttons.approve")
         self.value = True
         self.stop()
 
-    @button(label="Decline", style=ButtonStyle.danger)
-    async def decline(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
+    @button(style=ButtonStyle.danger)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        button.label = self.ctx.bot.get_text("system.confirm.confirmation.buttons.decline")
         self.value = False
         self.stop()
 
@@ -472,7 +477,9 @@ class Context(OriginalContext):
             try:
                 message = await self.send(embed=embed, view=view)
             except HTTPException as exc:
-                raise UserInputError("Failed to send prompt message!") from exc
+                raise UserInputError(
+                    self.bot.get_text("system.confirm.FAILED_SEND_PROMPT")
+                ) from exc
 
             await view.wait()
             if delete_after:
@@ -481,7 +488,9 @@ class Context(OriginalContext):
             if view.value is True:
                 return True
 
-            raise UserInputError("Confirmation prompt wasn't approved!")
+            raise UserInputError(
+                self.bot.get_text("system.confirm.PROMPT_NOT_APPROVED")
+            )
         
     async def confirm(
         self,
@@ -508,7 +517,9 @@ class Context(OriginalContext):
             try:
                 message = await self.send(embed=embed, view=view)
             except HTTPException as exc:
-                    raise UserInputError("Failed to send prompt message!") from exc
+                    raise UserInputError(
+                        self.bot.get_text("system.confirm.FAILED_SEND_PROMPT")
+                    ) from exc
 
             await view.wait()
             if delete_after:
@@ -517,7 +528,9 @@ class Context(OriginalContext):
             if view.value is True:
                     return True
 
-            raise UserInputError("Confirmation prompt wasn't approved!")
+            raise UserInputError(
+                self.bot.get_text("system.confirm.PROMPT_NOT_APPROVED")
+            )
 
     async def currency(self, text, **kwargs):
         """
