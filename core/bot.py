@@ -477,7 +477,8 @@ class Evict(commands.AutoShardedBot):
             )
 
             return await ctx.warn(
-                f"Command `{ctx.command.qualified_name}` raised an exception. Please try again later.",
+                self.get_text("system.errors.COMMAND.EXCEPTION", 
+                    command=ctx.command.qualified_name),
                 content=f"`{key}`",
             )
 
@@ -510,14 +511,15 @@ class Evict(commands.AutoShardedBot):
             elif isinstance(exc, TagScriptError):
                 if isinstance(exc, EmbedParseError):
                     return await ctx.warn(
-                        "Something is wrong with your **script**!",
+                        self.get_text("system.errors.COMMAND.SCRIPT_ERROR"),
                         *exc.args,
                     )
 
             elif isinstance(exc, FlagError):
                 if isinstance(exc, TooManyFlags):
                     return await ctx.warn(
-                        f"You specified the **{exc.flag.name}** flag more than once!"
+                        self.get_text("system.errors.COMMAND.FLAG.DUPLICATE",
+                            flag_name=exc.flag.name)
                     )
 
                 elif isinstance(exc, BadFlagArgument):
@@ -526,21 +528,22 @@ class Evict(commands.AutoShardedBot):
                     except AttributeError:
                         annotation = exc.flag.annotation.__class__.__name__
 
-                    return await ctx.warn(
-                        f"Failed to cast **{exc.flag.name}** to `{annotation}`!",
-                        *(
-                            ["Make sure you provide **on** or **off** for `Status` flags!"]
-                            if annotation == "Status"
-                            else []
-                        ),
-                    )
+                    msg = self.get_text("system.errors.COMMAND.FLAG.CAST_ERROR",
+                        flag_name=exc.flag.name,
+                        annotation=annotation)
+                    
+                    if annotation == "Status":
+                        msg = [msg, self.get_text("system.errors.COMMAND.FLAG.STATUS_HINT")]
+                    
+                    return await ctx.warn(*msg)
 
                 elif isinstance(exc, MissingRequiredFlag):
                     return await ctx.warn(f"You must specify the **{exc.flag.name}** flag!")
 
                 elif isinstance(exc, MissingFlagArgument):
                     return await ctx.warn(
-                        f"You must specify a value for the **{exc.flag.name}** flag!"
+                        self.get_text("system.errors.COMMAND.FLAG.MISSING_VALUE",
+                            flag_name=exc.flag.name)
                     )
 
             elif isinstance(exc, CommandInvokeError):
@@ -551,16 +554,19 @@ class Evict(commands.AutoShardedBot):
                     return
 
                 return await ctx.warn(
-                    f"This command can only be used **{plural(exc.number):time}**"
-                    f" per **{exc.per.name}** concurrently!",
+                    self.get_text("system.errors.CONCURRENCY.MAX_CONCURRENT",
+                        number=plural(exc.number),
+                        time="time",
+                        per=exc.per.name),
                     delete_after=5,
                 )
 
             elif isinstance(exc, CommandOnCooldown):
                 if exc.retry_after > 30:
                     return await ctx.warn(
-                        "This command is currently on cooldown!",
-                        f"Try again in **{format_timespan(exc.retry_after)}**",
+                        self.get_text("system.errors.CONCURRENCY.COOLDOWN.MESSAGE"),
+                        self.get_text("system.errors.CONCURRENCY.COOLDOWN.RETRY",
+                            time=format_timespan(exc.retry_after))
                     )
 
                 return await ctx.message.add_reaction("⏰")
@@ -568,31 +574,39 @@ class Evict(commands.AutoShardedBot):
             elif isinstance(exc, BadUnionArgument):
                 if exc.converters == (Member, User):
                     return await ctx.warn(
-                        f"No **{exc.param.name}** was found matching **{ctx.current_argument}**!",
-                        "If the user is not in this server, try using their **ID** instead",
+                        self.get_text("system.errors.SEARCH.MEMBER_USER",
+                            param=exc.param.name,
+                            argument=ctx.current_argument),
+                        self.get_text("system.errors.SEARCH.USER_ID_HINT")
                     )
 
                 elif exc.converters == (Guild, Invite):
                     return await ctx.warn(
-                        f"No server was found matching **{ctx.current_argument}**!",
+                        self.get_text("system.errors.SEARCH.SERVER",
+                            argument=ctx.current_argument)
                     )
 
                 else:
                     return await ctx.warn(
-                        f"Casting **{exc.param.name}** to {human_join([f'`{c.__name__}`' for c in exc.converters])} failed!",
+                        self.get_text("system.errors.SEARCH.CASTING",
+                            param=exc.param.name,
+                            converters=human_join([f'`{c.__name__}`' for c in exc.converters]))
                     )
 
             elif isinstance(exc, (MemberNotFound, UserNotFound, RoleNotFound, 
                                ChannelNotFound, BadInviteArgument, MessageNotFound)):
-                error_messages = {
-                    MemberNotFound: f"No **member** was found matching **{exc.argument}**!",
-                    UserNotFound: f"No **user** was found matching `{exc.argument}`!",
-                    RoleNotFound: f"No **role** was found matching **{exc.argument}**!",
-                    ChannelNotFound: f"No **channel** was found matching **{exc.argument}**!",
-                    BadInviteArgument: "Invalid **invite code** provided!",
-                    MessageNotFound: "The provided **message** was not found!\nTry using the **message URL** instead",
+                error_types = {
+                    MemberNotFound: "MEMBER",
+                    UserNotFound: "USER",
+                    RoleNotFound: "ROLE",
+                    ChannelNotFound: "CHANNEL",
+                    BadInviteArgument: "INVITE",
+                    MessageNotFound: "MESSAGE"
                 }
-                return await ctx.warn(error_messages[type(exc)])
+                return await ctx.warn(
+                    self.get_text(f"system.errors.SEARCH.NOT_FOUND.{error_types[type(exc)]}",
+                        argument=getattr(exc, 'argument', ''))
+                )
 
             elif isinstance(exc, RangeError):
                 label = ""
@@ -603,25 +617,26 @@ class Evict(commands.AutoShardedBot):
                 elif exc.maximum is not None and exc.minimum is not None:
                     label = f"between `{exc.minimum}` and `{exc.maximum}`"
 
-                if label and isinstance(exc.value, str):
-                    label += " characters"
-
-                return await ctx.warn(f"The input must be {label}!")
+                translation_key = "RANGE_CHARS" if label and isinstance(exc.value, str) else "RANGE"
+                return await ctx.warn(
+                    self.get_text(f"system.errors.VALIDATION.{translation_key}",
+                        label=label)
+                )
 
             elif isinstance(exc, MissingPermissions):
                 permissions = human_join(
                     [f"`{permission}`" for permission in exc.missing_permissions],
-                    final="and",
+                    final="and"
                 )
-                _plural = "s" if len(exc.missing_permissions) > 1 else ""
-
                 return await ctx.warn(
-                    f"You're missing the {permissions} permission{_plural}!"
+                    self.get_text("system.errors.PERMISSIONS.USER_MISSING",
+                        permissions=permissions,
+                        plural="s" if len(exc.missing_permissions) > 1 else "")
                 )
             
             elif isinstance(exc, NSFWChannelRequired):
                 return await ctx.warn(
-                    "This command can only be used in NSFW channels!"
+                    self.get_text("system.errors.PERMISSIONS.NSFW_REQUIRED")
                 )
 
             elif isinstance(exc, CommandError):
@@ -642,11 +657,11 @@ class Evict(commands.AutoShardedBot):
                         if not perms.manage_roles:
                             missing_perms.append('`manage_roles`')
                             
-                        error_msg = (
-                            f"I'm missing the following permissions: {', '.join(missing_perms)}\n"
-                            if missing_perms else
-                            "I'm missing required permissions. Please check my role's permissions and position.\n"
-                        )
+                        if missing_perms:
+                            error_msg = self.get_text("system.errors.PERMISSIONS.BOT_MISSING",
+                                permissions=', '.join(missing_perms))
+                        else:
+                            error_msg = self.get_text("system.errors.PERMISSIONS.BOT_MISSING_GENERIC")
                         
                         return await ctx.warn(
                             error_msg,
