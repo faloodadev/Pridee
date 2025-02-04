@@ -1,0 +1,57 @@
+{
+  "language": "English",
+  "language_code": "en",
+  "language_local": "en-US",
+  "commands": {
+    "invite": {
+      "DESCRIPTION": "Get an invite link for the bot."
+    },
+    "discord": {
+      "DESCRIPTION": "Get an invite link for the bot's support server."
+    },
+    "about": {
+      "DESCRIPTION": "View information about the bot.",
+      "EMBED": {
+        "DESCRIPTION_LINE_ONE": "Developed and maintained by [x](https://discord.com/users/598125772754124823), [adam](https://discord.com/users/930383131863842816), [harry](https://discordapp.com/users/187747524646404105)",
+        "DESCRIPTION_LINE_TWO": "Utilizing `{cached_commands}` commands across `{total_cogs}` cogs (`{extended_cogs}` total modules)",
+        "FIELDS": [
+          {
+            "name": "**Bot**",
+            "values": [
+              "**Users:** `{cached_users}`",
+              "**Servers:** `{cached_guilds}`",
+              "**Created:** `{created_at}`"
+            ]
+          },
+          {
+            "name": "**System**",
+            "values": [
+              "**CPU:** `{cpu_usage}%`",
+              "**Memory:** `{memory_usage}%`",
+              "**Launched:** `{uptime}`"
+            ]
+          },
+          {
+            "name": "**Code**",
+            "values": [
+              "**Lines:** `{lines_of_code}`",
+              "**Files:** `{total_files}`",
+              "**Imports:** `{total_imports}`",
+              "**Functions:** `{total_functions}`"
+            ]
+          }
+        ],
+        "FOOTER": "evict/v{version} • Latest Commit: {latest_commit}"
+      }
+    },
+    "ping": {
+      "DESCRIPTION": "View the bot's latency.",
+      "INITAL_EMBED": {
+        "description": "pinging..."
+      },
+      "UPDATED_EMBED": {
+        "description": "`{ping}ms` (edit: `{edit_ping}ms`)"
+      }
+    }
+  }
+}
