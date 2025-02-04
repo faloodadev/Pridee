@@ -43,24 +43,22 @@ from utils.computation import heavy_computation
 from core.http import MonitoredHTTPClient
 from utils.prefix import getprefix
 from core.help import EvictHelp
-from utils.instrumentation import BotInstrumentation, trace_method, setup_telemetry
-from utils.optimization import setup_cpu_optimizations
-from utils.distributed import DistributedProcessing
 from utils.monitoring import PerformanceMonitoring
-from utils.monitoring import setup_monitoring
+from utils.optimization import setup_cpu_optimizations
+from core.dask import DaskManager
 from utils.tracing import tracer
 from utils.logger import log
 from core.ipc import ClusterIPC
 from core.browser import BrowserHandler
 import config
 from processors.backup import run_pg_dump, process_bunny_upload
-from processors.image_generation import process_image_effect
+from processors.image_generator import process_image_effect
 from processors.guild import (
     process_guild_data,
     process_jail_permissions,
     process_add_role
 )
-from utils.formatting import plural, format_timespan, human_join
+from utils.formatter import plural, format_timespan, human_join
 from contextlib import suppress
 from wavelink import NodePool
 from core.backup import BackupManager
@@ -85,18 +83,17 @@ class Evict(commands.AutoShardedBot):
     process: psutil.Process
     _last_system_check: float
     _is_ready: asyncio.Event
-    instrumentation: BotInstrumentation
-    distributed: DistributedProcessing
     monitoring: PerformanceMonitoring
     translations: dict
     tracer: Tracer
     api_stats: dict
     _last_stats_cleanup: float
     ipc: ClusterIPC
+    dask: DaskManager
 
     def __init__(self, *args, **kwargs):
-        self.distributed = DistributedProcessing()
-        self.monitoring = setup_monitoring()
+        self.monitoring = PerformanceMonitoring()
+        self.dask = DaskManager()
         self.tracer = tracer.get_tracer(__name__)
         self.translations = {}
         self._load_translations()
@@ -136,24 +133,6 @@ class Evict(commands.AutoShardedBot):
         self._init_attributes()
         self._setup_cooldowns()
         self._setup_process_pool()
-        self.instrumentation = BotInstrumentation()
-        
-        self.api_stats = defaultdict(lambda: {
-            'calls': 0,
-            'errors': 0,
-            'total_time': 0,
-            'rate_limits': 0
-        })
-        self._last_stats_cleanup = time.time()
-
-        self.help_command.cog = self
-
-        self.browser = BrowserHandler()
-        
-        self._init_attributes()
-        self._setup_cooldowns()
-        self._setup_process_pool()
-        self.instrumentation = BotInstrumentation()
         
         self.api_stats = defaultdict(lambda: {
             'calls': 0,
@@ -217,11 +196,10 @@ class Evict(commands.AutoShardedBot):
         log.info("Starting setup hook...")
         try:
             setup_cpu_optimizations()
-            setup_telemetry()
             
             self.monitoring.setup("http://localhost:4317")
             
-            await self.distributed.setup()
+            await self.dask.setup()
             
             await self._init_services()
             await self._init_monitoring()
@@ -425,7 +403,7 @@ class Evict(commands.AutoShardedBot):
         with self.monitoring.tracer.start_as_current_span("heavy_task") as span:
             start_time = time.time()
             try:
-                result = await self.distributed.submit_task(heavy_computation, *args)
+                result = await self.dask.submit_task(heavy_computation, *args)
                 self.monitoring.record_operation("heavy_task", time.time() - start_time)
                 return result
             except Exception as e:
@@ -818,7 +796,7 @@ class Evict(commands.AutoShardedBot):
                     next_run = self._calculate_next_backup_time()
                     await asyncio.sleep((next_run - datetime.now(timezone.utc)).total_seconds())
                     
-                    success = await self.distributed.submit_task(
+                    success = await self.dask.submit_task(
                         self.backup_manager.run_backup
                     )
                     
@@ -921,7 +899,7 @@ class Evict(commands.AutoShardedBot):
         with self.monitoring.tracer.start_as_current_span("process_image") as span:
             span.set_attribute("effect_type", effect_type)
             try:
-                return await self.distributed.submit_pool_task(
+                return await self.dask.submit_pool_task(
                     process_image_effect,
                     buffer,
                     effect_type,
@@ -946,7 +924,7 @@ class Evict(commands.AutoShardedBot):
             
             try:
                 processor = processors_map[process_type]
-                return await self.distributed.submit_pool_task(
+                return await self.dask.submit_pool_task(
                     processor,
                     *args,
                     **kwargs
@@ -960,7 +938,7 @@ class Evict(commands.AutoShardedBot):
         """Process backup tasks using process pool."""
         with self.monitoring.tracer.start_as_current_span("process_backup") as span:
             try:
-                result = await self.distributed.submit_pool_task(
+                result = await self.dask.submit_pool_task(
                     run_pg_dump,
                     command
                 )

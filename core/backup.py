@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 from utils.logger import log
-from opentelemetry import trace
+from utils.monitoring import PerformanceMonitoring
 
 class BackupManager:
     def __init__(self, bot):
@@ -14,23 +14,23 @@ class BackupManager:
         self.schemas_dir = self.backup_dir / "schemas"
         self.full_dir = self.backup_dir / "full"
         self.retention_days = 7
-        self.tracer = trace.get_tracer(__name__)
+        self.monitoring = PerformanceMonitoring()
         
         for directory in (self.backup_dir, self.schemas_dir, self.full_dir):
             directory.mkdir(exist_ok=True)
 
     async def run_backup(self) -> bool:
         """Run distributed backup process."""
-        with self.tracer.start_as_current_span("run_backup") as span:
+        with self.monitoring.tracer.start_as_current_span("run_backup") as span:
             timestamp = datetime.now(timezone.utc)
             
             try:
-                schema_task = self.bot.distributed.submit_task(
+                schema_task = self.bot.dask.client.submit(
                     self._create_schema_backup,
                     timestamp=timestamp
                 )
                 
-                full_task = self.bot.distributed.submit_task(
+                full_task = self.bot.dask.client.submit(
                     self._create_full_backup,
                     timestamp=timestamp
                 )
@@ -41,7 +41,7 @@ class BackupManager:
                 )
                 
                 if schema_success and full_success:
-                    self.bot.distributed.submit_task(
+                    self.bot.dask.client.submit(
                         self._cleanup_old_backups
                     )
                     return True
@@ -102,13 +102,13 @@ class BackupManager:
 
         try:
             if data := await self.bot.process_backup(command):
-                await self.bot.distributed.submit_thread_task(
+                await self.bot.dask.client.submit(
                     self._save_backup,
                     data,
                     local_path
                 )
                 
-                success = await self.bot.distributed.submit_thread_task(
+                success = await self.bot.dask.client.submit(
                     self._upload_backup,
                     local_path,
                     remote_path

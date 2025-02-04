@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from dask.distributed import Client as DaskClient
 import config
 
 from core.bot import Evict
@@ -8,6 +7,7 @@ from utils.optimization import setup_cpu_optimizations
 from utils.monitoring import setup_monitoring
 from utils.logger import setup_logging
 from utils.monitoring import cleanup_monitoring
+from core.dask import DaskManager
 
 log = logging.getLogger(__name__)
 
@@ -35,10 +35,10 @@ async def start_cluster(shard_ids, shard_count, **kwargs):
 
 async def main():
     try:
-        
         setup_logging()
 
-        dask_client = await DaskClient(asynchronous=True)
+        dask_manager = DaskManager()
+        await dask_manager.setup()
         
         cluster_tasks = []
         for i in range(config.SHARDING.CLUSTER_COUNT):
@@ -47,19 +47,16 @@ async def main():
                 start_cluster(
                     shard_ids=shard_ids,
                     shard_count=config.SHARDING.TOTAL_SHARDS,
-                    dask_client=dask_client
+                    dask_client=dask_manager.client
                 )
             )
         
         await asyncio.gather(*cluster_tasks)
-        
+
+        await dask_manager.cleanup()
     except Exception as e:
         log.exception(f"Fatal error in main: {e}")
         raise
-    finally:
-        await dask_client.close()
-        await cleanup_monitoring()
-        setup_logging.cleanup()
 
 if __name__ == "__main__":
     try:
