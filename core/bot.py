@@ -91,6 +91,7 @@ class Evict(commands.AutoShardedBot):
     _last_stats_cleanup: float
     ipc: ClusterIPC
     dask: DaskManager
+    _cleanup_event: asyncio.Event
 
     def __init__(self, *args, **kwargs):
         self.monitoring = PerformanceMonitoring()
@@ -158,19 +159,48 @@ class Evict(commands.AutoShardedBot):
         self._last_system_check = 0
         self.command_stats = defaultdict(lambda: {'calls': 0, 'total_time': 0})
         self._is_ready = asyncio.Event()
+        self._cleanup_event = asyncio.Event()
 
     def _setup_cooldowns(self):
+        """Setup advanced cooldown and rate-limit system."""
         self.global_cooldown = CooldownMapping.from_cooldown(2, 3, BucketType.user)
         self.add_check(self.check_global_cooldown)
-        self.guild_ratelimit_10s = CooldownMapping.from_cooldown(
-            config.RATELIMITS.PER_10S, 10, BucketType.guild
+        
+        self.guild_ratelimits = {
+            '10s': CooldownMapping.from_cooldown(
+                config.RATELIMITS.PER_10S, 
+                10, 
+                BucketType.guild
+            ),
+            '30s': CooldownMapping.from_cooldown(
+                config.RATELIMITS.PER_30S, 
+                30, 
+                BucketType.guild
+            ),
+            '1m': CooldownMapping.from_cooldown(
+                config.RATELIMITS.PER_1M, 
+                60, 
+                BucketType.guild
+            )
+        }
+        
+        self.channel_ratelimit = CooldownMapping.from_cooldown(
+            config.RATELIMITS.PER_CHANNEL, 
+            5, 
+            BucketType.channel
         )
-        self.guild_ratelimit_30s = CooldownMapping.from_cooldown(
-            config.RATELIMITS.PER_30S, 30, BucketType.guild
+        
+        self.heavy_command_cooldown = CooldownMapping.from_cooldown(
+            1, 30, BucketType.user
         )
-        self.guild_ratelimit_1m = CooldownMapping.from_cooldown(
-            config.RATELIMITS.PER_1M, 60, BucketType.guild
-        )
+        
+        self.violation_tracker = defaultdict(lambda: {
+            'count': 0,
+            'last_violation': 0,
+            'cooldown_multiplier': 1
+        })
+        
+        self.loop.create_task(self._cleanup_violations())
 
     def _setup_process_pool(self):
         self.process_pool = Pool(
@@ -235,7 +265,6 @@ class Evict(commands.AutoShardedBot):
         self.database = await Database.connect()
         self.redis = await Redis.from_url()
         
-        self.browser = BrowserHandler()
         await self.browser.init()
 
     PerformanceMonitoring().trace_method
@@ -973,3 +1002,72 @@ class Evict(commands.AutoShardedBot):
         while True:
             await self.ipc.heartbeat()
             await asyncio.sleep(20)
+
+    PerformanceMonitoring().trace_method
+    async def check_ratelimit(self, ctx: Context) -> bool:
+        """
+        Check all rate limits and update violation tracking.
+        Returns True if allowed, False if rate limited.
+        """
+        current_time = time.time()
+        
+        for duration, cooldown in self.guild_ratelimits.items():
+            bucket = cooldown.get_bucket(ctx.message)
+            if bucket and bucket.update_rate_limit(current_time):
+                guild_violations = self.violation_tracker[ctx.guild.id]
+                guild_violations['count'] += 1
+                guild_violations['last_violation'] = current_time
+                
+                if guild_violations['count'] > 5:
+                    guild_violations['cooldown_multiplier'] = min(
+                        guild_violations['cooldown_multiplier'] * 2,
+                        10 
+                    )
+                    
+                await ctx.send(
+                    f"This guild is being rate limited. Try again in {duration}.",
+                    delete_after=5
+                )
+                return False
+        
+        if bucket := self.channel_ratelimit.get_bucket(ctx.message):
+            if bucket.update_rate_limit(current_time):
+                await ctx.send("This channel is being rate limited.", delete_after=5)
+                return False
+                
+        if ctx.command.qualified_name in config.HEAVY_COMMANDS:
+            if bucket := self.heavy_command_cooldown.get_bucket(ctx.message):
+                if bucket.update_rate_limit(current_time):
+                    await ctx.send(
+                        f"This command has a 30s cooldown. Please wait.",
+                        delete_after=5
+                    )
+                    return False
+        
+        return True
+
+    async def _cleanup_violations(self):
+        """Periodically clean up old violation records."""
+        while not self.is_closed():
+            try:
+                current_time = time.time()
+                async with self.monitoring.tracer.start_as_current_span("cleanup_violations"):
+                    for guild_id, data in list(self.violation_tracker.items()):
+                        if current_time - data['last_violation'] > 3600:
+                            data['count'] = max(0, data['count'] - 1)
+                            data['cooldown_multiplier'] = max(1, data['cooldown_multiplier'] / 2)
+                            
+                        if data['count'] == 0:
+                            del self.violation_tracker[guild_id]
+                
+                try:
+                    await asyncio.wait_for(
+                        self._cleanup_event.wait(),
+                        timeout=300
+                    )
+                except asyncio.TimeoutError:
+                    continue
+                    
+            except Exception as e:
+                log.error(f"Error in violation cleanup: {e}")
+                await asyncio.sleep(60)  
