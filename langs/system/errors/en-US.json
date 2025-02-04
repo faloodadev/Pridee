@@ -11,7 +11,8 @@
                     "DUPLICATE": "You specified the **{flag_name}** flag more than once!",
                     "CAST_ERROR": "Failed to cast **{flag_name}** to `{annotation}`!",
                     "STATUS_HINT": "Make sure you provide **on** or **off** for `Status` flags!",
-                    "MISSING_VALUE": "You must specify a value for the **{flag_name}** flag!"
+                    "MISSING_VALUE": "You must specify a value for the **{flag_name}** flag!",
+                    "MISSING_REQUIRED": "You must specify the **{flag_name}** flag!"
                 }
             },
             "CONCURRENCY": {

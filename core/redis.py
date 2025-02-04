@@ -12,10 +12,8 @@ from redis.asyncio import Redis as DefaultRedis
 from redis.asyncio.connection import BlockingConnectionPool
 from redis.asyncio.lock import Lock
 from redis.backoff import EqualJitterBackoff
-from redis.exceptions import NoScriptError
 from redis.retry import Retry
-from redis.typing import AbsExpiryT, EncodableT, ExpiryT, FieldT, KeyT
-from xxhash import xxh32_hexdigest
+from redis.typing import AbsExpiryT, EncodableT, ExpiryT, KeyT
 from opentelemetry import trace
 
 from utils.logger import log

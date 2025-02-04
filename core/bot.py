@@ -538,7 +538,10 @@ class Evict(commands.AutoShardedBot):
                     return await ctx.warn(*msg)
 
                 elif isinstance(exc, MissingRequiredFlag):
-                    return await ctx.warn(f"You must specify the **{exc.flag.name}** flag!")
+                    return await ctx.warn(
+                        self.bot.get_text("system.errors.COMMAND.FLAG.MISSING_REQUIRED",
+                            flag_name=exc.flag.name)
+                    )
 
                 elif isinstance(exc, MissingFlagArgument):
                     return await ctx.warn(
