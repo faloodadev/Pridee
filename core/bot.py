@@ -74,7 +74,7 @@ class Evict(commands.AutoShardedBot):
     redis: Redis
     user: ClientUser
     reddit: RedditClient
-    version: str = "3.0"
+    version: str = "b4.0"
     user_agent: str = f"Evict (DISCORD BOT/{version})"
     browser: BrowserHandler
     voice_join_times = {}
