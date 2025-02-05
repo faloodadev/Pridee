@@ -5,7 +5,7 @@ from discord import Guild, Member, Role
 from discord.abc import GuildChannel
 
 import config
-from tools.cache import cache
+from core.cache import cache, Strategy
 
 if TYPE_CHECKING:
     from main import Evict
@@ -161,8 +161,9 @@ class Settings:
         self.fetch.invalidate_containing(self.guild.id)
 
     @classmethod
-    @cache()
+    @cache(maxsize=128, strategy=Strategy.lru)
     async def fetch(cls, bot: "Evict", guild: Guild) -> "Settings":
+        """Fetch settings for a guild."""
         record = await bot.db.fetchrow(
             """
             INSERT INTO settings (guild_id)

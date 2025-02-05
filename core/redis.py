@@ -17,9 +17,9 @@ from redis.typing import AbsExpiryT, EncodableT, ExpiryT, KeyT
 from opentelemetry import trace
 
 from utils.logger import log
-import config
+from config import REDIS
 
-REDIS_URL = f"redis://{config.REDIS.HOST}"
+REDIS_URL = REDIS.DSN
 
 INCREMENT_SCRIPT = b"""
     local current

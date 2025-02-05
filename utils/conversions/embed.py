@@ -11,11 +11,11 @@ from discord.ext.commands import CommandError, Converter
 from discord.ui import Button, View  # type: ignore
 from discord.utils import escape_markdown, utcnow
 from pydantic import BaseModel, ValidationError
-from tools.converters.color import colors
-from tools.utilities import tagscript, hidden
-from tools.utilities.humanize import comma, ordinal
-from core.client.context import Context
-from tools.utilities.managers.regex import IMAGE_URL, URL
+from utils.converters.color import colors
+from utils.tools.utilities import tagscript, hidden
+from utils.tools.utilities.humanize import comma, ordinal
+from core.context import Context
+from utils.tools.utilities.managers.regex import IMAGE_URL, URL
 
 
 # Temporary till we actually implement the welcome system
@@ -90,6 +90,7 @@ class EmbedScript(BaseModel):
         "embeds": [],
         "button": []
     }
+    parser: Any = None
     _MAX_TITLE_LENGTH: int = 256
     _MAX_DESCRIPTION_LENGTH: int = 4096
     _MAX_FIELD_NAME_LENGTH: int = 256
@@ -101,10 +102,9 @@ class EmbedScript(BaseModel):
         arbitrary_types_allowed = True
 
     def __init__(self, script: str, is_voicemaster: bool = False):
+        super().__init__(script=script, is_voicemaster=is_voicemaster)
         try:
-            super().__init__(script=script, is_voicemaster=is_voicemaster)
             self.parser = tagscript.Parser()
-            self.embed_parser = tagscript.FunctionParser()
             self._setup_parsers()
         except Exception as e:
             raise EmbedValidationError(f"Failed to initialize embed: {str(e)}")
@@ -646,19 +646,6 @@ class EmbedScript(BaseModel):
                 """Return a random item from the list"""
                 return random.choice(items)
 
-            @self.embed_parser.method(
-                name="title", 
-                usage="(value)", 
-                aliases=["t"]
-            )
-            async def embed_title(_: None, value: str):
-                """Set the title of the embed with validation."""
-                if len(value) > self._MAX_TITLE_LENGTH:
-                    raise EmbedValidationError(
-                        f"Title exceeds {self._MAX_TITLE_LENGTH} characters"
-                    )
-                self.objects["embed"].title = value
-
         except Exception as e:
             raise EmbedParsingError(f"Failed to parse embed: {str(e)}")
 
@@ -695,7 +682,7 @@ class EmbedScript(BaseModel):
             for script in self.script.split("{embed}"):
                 if script := script.strip():
                     self.objects["embed"] = Embed()
-                    await self.embed_parser.parse(script)
+                    await self.parser.parse(script)
                     if embed := self.objects.pop("embed", None):
                         self.objects["embeds"].append(embed)
             self.objects.pop("embed", None)
@@ -704,7 +691,7 @@ class EmbedScript(BaseModel):
                 if type(error) is TypeError:
                     function = [
                         tag
-                        for tag in self.embed_parser.tags
+                        for tag in self.parser.tags
                         if tag.callback.__name__ == error.args[0].split("(")[0]
                     ][0].name
                     parameters = str(error).split("'")[1].split(", ")

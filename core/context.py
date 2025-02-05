@@ -16,7 +16,7 @@ from typing import (
     Dict,
     TypeAlias,
 )
-from aiomisc import PeriodicCallback
+from discord.ext import tasks
 
 from aiohttp import ClientSession
 from discord import (
@@ -44,10 +44,10 @@ from discord.utils import cached_property
 from typing import List
 from xxhash import xxh32_hexdigest
 
-from tools import View, quietly_delete
+from utils.tools import View, quietly_delete
 from managers.paginator import Paginator
-from core.client.database import Database, Settings
-from core.client.redis import Redis
+from core.database import Database, Settings
+from core.redis import Redis
 from opentelemetry import trace
 
 if TYPE_CHECKING:
@@ -131,7 +131,7 @@ class Typing(DefaultTyping):
 
 
 class Loading:
-    callback: Optional[PeriodicCallback]
+    callback: Optional[tasks.Loop]
     ctx: Context
     channel: VoiceChannel | TextChannel | Thread
 
@@ -175,7 +175,7 @@ class Loading:
         if await self.locked():
             return
 
-        self.callback = PeriodicCallback(self.task)
+        self.callback = tasks.Loop(self.task)
         self.callback.start(10, delay=2)
 
     async def __aexit__(

@@ -3,6 +3,7 @@ from json import dumps, loads
 from asyncpg import Connection, Pool, Record as DefaultRecord, create_pool
 from opentelemetry import trace
 from utils.logger import log
+from .settings import Settings
 
 def json_encoder(obj: Any) -> str:
     return dumps(obj)

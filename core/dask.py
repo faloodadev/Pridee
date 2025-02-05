@@ -10,14 +10,15 @@ class DaskManager:
     async def setup(self) -> None:
         """Create and configure Dask client with dashboard."""
         try:
-            self.client = await Client(
-                asynchronous=True,
-                dashboard_address=f"{config.DASK.HOST}:{config.DASK.PORT}",
-                security=None if config.DASK.ALLOW_ANONYMOUS else {
-                    'username': config.DASK.USERNAME,
-                    'password': config.DASK.PASSWORD
-                }
-            )
+            client_kwargs = {
+                "asynchronous": True,
+                "dashboard_address": f"{config.DASK.HOST}:{config.DASK.PORT}",
+            }
+
+            if not config.DASK.ALLOW_ANONYMOUS:
+                log.warning("Authentication for Dask dashboard is not supported in this setup. Running without authentication.")
+
+            self.client = await Client(**client_kwargs)
             
             dashboard_link = self.client.dashboard_link
             log.info(f"Dask dashboard available at: {dashboard_link}")

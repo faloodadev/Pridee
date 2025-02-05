@@ -11,7 +11,7 @@ from discord.ext.commands import Command
 from discord.utils import MISSING
 from discord.ext.commands import Context
 
-from tools.conversion import Status
+from utils.conversions import Status
 from managers.paginator import Paginator
 
 from typing import List, Mapping, Union, Any, Callable, Coroutine

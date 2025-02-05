@@ -39,3 +39,12 @@ pytest-asyncio>=0.23.5
 humanfriendly>=10.0
 pydantic>=2.6.1
 yarl>=1.9.4
+
+anyio
+cairosvg
+colortheif
+cryptography
+wand
+aiomisc
+xxhash
+pomice

@@ -82,7 +82,6 @@ async def _process_batch(items: List[Dict]) -> List[Dict]:
     """Process a batch of items in parallel"""
     try:
         def process_item(item: Dict) -> Dict:
-            # Add processing logic per item
             result = item.copy()
             
             if "text" in item:
