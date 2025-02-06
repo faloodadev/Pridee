@@ -2,33 +2,43 @@ from distributed import Client
 from typing import Optional
 from utils.logger import log
 import config
+import dask
+from dask.distributed import LocalCluster
+import socket
 
 class DaskManager:
     def __init__(self):
-        self.client: Optional[Client] = None
+        self.client = None
+        self.cluster = None
 
-    async def setup(self) -> None:
-        """Create and configure Dask client with dashboard."""
+    async def setup(self):
+        """Initialize the Dask cluster and client."""
         try:
-            client_kwargs = {
-                "asynchronous": True,
-                "dashboard_address": f"{config.DASK.HOST}:{config.DASK.PORT}",
-            }
+            dask.config.set({
+                'distributed.dashboard.link': 'http://{host}:{port}/status',
+                'distributed.dashboard.address': ':8787',  
+            })
 
-            if not config.DASK.ALLOW_ANONYMOUS:
-                log.warning("Authentication for Dask dashboard is not supported in this setup. Running without authentication.")
+            self.cluster = await LocalCluster(
+                n_workers=4,
+                threads_per_worker=4,
+                memory_limit='4GB',
+                dashboard_address=':8787',  
+                host='0.0.0.0', 
+                asynchronous=True,
+            )
 
-            self.client = await Client(**client_kwargs)
-            
-            dashboard_link = self.client.dashboard_link
-            log.info(f"Dask dashboard available at: {dashboard_link}")
-            
+            self.client = await Client(self.cluster, asynchronous=True)
+            log.info(f"Dask dashboard available at: http://{socket.gethostbyname(socket.gethostname())}:8787/status")
+            return self.client
+
         except Exception as e:
-            log.exception(f"Failed to create Dask client: {e}")
+            log.error(f"Failed to initialize Dask: {e}")
             raise
 
-    async def cleanup(self) -> None:
-        """Cleanup Dask client"""
+    async def cleanup(self):
+        """Cleanup Dask resources."""
         if self.client:
             await self.client.close()
-            self.client = None 
+        if self.cluster:
+            await self.cluster.close() 

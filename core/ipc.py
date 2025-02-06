@@ -21,17 +21,21 @@ class ClusterIPC:
         self._stop_event = asyncio.Event()
         self.last_heartbeat = 0
         self.tracer = trace.get_tracer(__name__)
+        self._message_lock = asyncio.Lock()
         log.info(f"IPC initialized for cluster {cluster_id}")
 
     async def start(self):
         """Start the IPC system."""
         try:
             self.redis = Redis.from_url(config.REDIS.DSN)
+            
             self.pubsub = self.redis.pubsub()
             log.info("Created Redis pubsub")
             
             await self.pubsub.subscribe(f"cluster_{self.cluster_id}")
             log.info(f"Subscribed to cluster_{self.cluster_id}")
+            
+            await asyncio.sleep(0.1)
             
             self.listener_task = asyncio.create_task(
                 self._listen(), 
@@ -52,21 +56,50 @@ class ClusterIPC:
             
         except Exception as e:
             log.error(f"Failed to start IPC: {e}", exc_info=True)
+            if self.pubsub:
+                await self.pubsub.close()
+            if self.redis:
+                await self.redis.close()
             raise
 
     async def _listen(self):
         """Listen for messages."""
         try:
             while not self._stop_event.is_set():
-                message = await self.pubsub.get_message(ignore_subscribe_messages=True)
+                try:
+                    message = await asyncio.wait_for(
+                        self.pubsub.get_message(ignore_subscribe_messages=True),
+                        timeout=0.1
+                    )
+                except asyncio.TimeoutError:
+                    continue
+                    
                 if message is None:
-                    await asyncio.sleep(0.1)
                     continue
                     
                 try:
-                    data = json.loads(message['data'])
-                    if handler := self.handlers.get(data['action']):
-                        await handler(data['data'])
+                    async with self._message_lock:
+                        data = json.loads(message['data'])
+                        log.info(f"Cluster {self.cluster_id} received message: {data}")
+                        
+                        if data.get('source_cluster') == self.cluster_id:
+                            log.debug(f"Skipping message from self")
+                            continue
+                            
+                        if handler := self.handlers.get(data['command']):
+                            log.info(f"Found handler for {data['command']}")
+                            response = await handler(data.get('data', {}))
+                            if response_channel := data.get('response_channel'):
+                                response_message = json.dumps({
+                                    'cluster_id': self.cluster_id,
+                                    'data': response,
+                                    'timestamp': datetime.utcnow().isoformat()
+                                })
+                                log.info(f"Sending response on channel {response_channel}: {response_message}")
+                                await self.redis.publish(response_channel, response_message)
+                        else:
+                            log.warning(f"No handler found for command: {data['command']}")
+                            log.debug(f"Available handlers: {list(self.handlers.keys())}")
                 except json.JSONDecodeError:
                     continue
                 except Exception as e:
@@ -132,19 +165,76 @@ class ClusterIPC:
             
         log.info("IPC cleanup complete")
 
-    async def broadcast(self, command: str, data: Optional[Dict[str, Any]] = None):
-        """Broadcast message to all clusters."""
+    async def broadcast(self, command: str, data: Optional[Dict[str, Any]] = None) -> Dict[int, Any]:
+        """
+        Broadcast message to all clusters and wait for responses.
+        Returns a dictionary mapping cluster IDs to their responses.
+        """
         with self.tracer.start_as_current_span("ipc_broadcast") as span:
             span.set_attribute("ipc.command", command)
+            
+            temp_redis = Redis.from_url(config.REDIS.DSN)
+            temp_pubsub = temp_redis.pubsub()
+            
+            response_channel = f"response_{command}_{self.cluster_id}_{datetime.utcnow().timestamp()}"
+            log.info(f"Broadcasting on response channel: {response_channel}")
+            
+            await temp_pubsub.subscribe(response_channel)
+            log.info("Subscribed to response channel")
+            
             message = json.dumps({
                 "command": command,
                 "data": data or {},
                 "timestamp": datetime.utcnow().isoformat(),
-                "source_cluster": self.cluster_id
+                "source_cluster": self.cluster_id,
+                "response_channel": response_channel
             })
             
-            for cluster_id in range(self.bot.cluster_count):
-                await self.redis.publish(f"cluster_{cluster_id}", message)
+            responses = {}
+            try:
+                log.info(f"Sending to {self.bot.cluster_count} clusters")
+                for cluster_id in range(self.bot.cluster_count):
+                    if cluster_id != self.cluster_id: 
+                        await self.redis.publish(f"cluster_{cluster_id}", message)
+                        log.info(f"Sent to cluster {cluster_id}")
+                
+                if handler := self.handlers.get(command):
+                    own_response = await handler(data or {})
+                    responses[self.cluster_id] = own_response
+                    log.info(f"Added own response: {own_response}")
+                
+                start_time = asyncio.get_event_loop().time()
+                
+                while len(responses) < self.bot.cluster_count:
+                    if asyncio.get_event_loop().time() - start_time > 5.0:
+                        log.warning(f"Broadcast timeout. Got {len(responses)} responses")
+                        break
+                        
+                    try:
+                        response = await asyncio.wait_for(
+                            temp_pubsub.get_message(ignore_subscribe_messages=True),
+                            timeout=0.1
+                        )
+                    except asyncio.TimeoutError:
+                        continue
+                        
+                    if response and response['type'] == 'message':
+                        try:
+                            response_data = json.loads(response['data'])
+                            log.info(f"Parsed response from cluster {response_data.get('cluster_id')}: {response_data}")
+                            if 'cluster_id' in response_data and 'data' in response_data:
+                                responses[response_data['cluster_id']] = response_data['data']
+                        except (json.JSONDecodeError, KeyError) as e:
+                            log.error(f"Error parsing response: {e}")
+                            continue
+                    
+            finally:
+                await temp_pubsub.unsubscribe(response_channel)
+                await temp_pubsub.close()
+                await temp_redis.close()
+                log.info(f"Broadcast complete. Got {len(responses)} responses")
+                
+            return responses
 
     async def send_to_cluster(self, cluster_id: int, command: str, data: Optional[Dict[str, Any]] = None):
         """Send message to specific cluster."""
@@ -159,7 +249,9 @@ class ClusterIPC:
                 "source_cluster": self.cluster_id
             })
             
+            log.info(f"Sending message to cluster {cluster_id}: {message}")
             await self.redis.publish(f"cluster_{cluster_id}", message)
+            log.info(f"Message sent to cluster {cluster_id}")
 
     async def get_cluster_status(self) -> List[Dict[str, Any]]:
         """Get status of all clusters."""

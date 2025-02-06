@@ -66,6 +66,7 @@ from contextlib import suppress
 from pomice import NodePool
 from core.backup import BackupManager
 import asyncpg
+from core.context import Context
 
 class Evict(commands.AutoShardedBot, commands.Cog):
     session: ClientSession
@@ -105,7 +106,7 @@ class Evict(commands.AutoShardedBot, commands.Cog):
         self.translations = {}
         self._load_translations()
         
-        self.cluster_id = kwargs.pop('cluster_id')
+        self.cluster_id = kwargs.pop('cluster_id', 0)
         self.cluster_count = kwargs.pop('cluster_count', 1)
         self.dask_client = kwargs.pop('dask_client')
         
@@ -145,21 +146,39 @@ class Evict(commands.AutoShardedBot, commands.Cog):
         
         self._init_attributes()
         self._setup_cooldowns()
+        
+        self.ipc = None  
 
     async def setup_hook(self) -> None:
-        """Setup hook for async initialization."""
+        """Setup hook that runs before the bot starts."""
         try:
-            log.info("Starting setup hook...")
+            self.monitoring = PerformanceMonitoring(service_name="evict-bot")
+            self.tracer = self.monitoring.tracer
+            log.info("Performance monitoring initialized")
             
-            await self._init_core_services()
-            await self._init_remaining_services()
+            with self.tracer.start_span("bot_setup") as setup_span:
+                await self._init_core_services()  
+                await self._init_remaining_services()
+                setup_span.set_attribute("status", "complete")
+            
+            self._setup_process_pool()
+            await self.load_cogs()
             
             self._is_ready.set()
             log.info("Setup complete!")
-
+            
         except Exception as e:
             log.error(f"Error in setup_hook: {e}", exc_info=True)
             raise
+
+    async def _handle_cluster_stats(self, data: dict) -> dict:
+        """Core handler for cluster stats requests"""
+        stats = {
+            'guild_count': len(self.guilds),
+            'member_count': sum(g.member_count for g in self.guilds)
+        }
+        log.info(f"Cluster {self.cluster_id} sending stats: {stats}")
+        return stats
 
     async def _init_core_services(self):
         """Initialize core services required for bot operation."""
@@ -175,6 +194,12 @@ class Evict(commands.AutoShardedBot, commands.Cog):
         )
         log.info("Initialized monitored HTTP client")
 
+        if self.ipc is None:
+            self.ipc = ClusterIPC(self, self.cluster_id)
+            self.ipc.add_handler("get_cluster_stats", self._handle_cluster_stats)
+            await self.ipc.start()
+            log.info(f"Started IPC system for cluster {self.cluster_id}")
+
         self.database = await asyncpg.create_pool(
             dsn=config.DATABASE.DSN,
             min_size=config.DATABASE.MIN_SIZE,
@@ -187,11 +212,6 @@ class Evict(commands.AutoShardedBot, commands.Cog):
 
         self.redis = Redis.from_url(config.REDIS.DSN)
         log.info("Connected to Redis")
-
-        log.info("Starting IPC initialization...")
-        self.ipc = ClusterIPC(self, self.cluster_id)
-        await self.ipc.start()
-        log.info("IPC initialization complete")
 
     async def _init_remaining_services(self):
         """Initialize remaining services after core initialization."""
@@ -341,10 +361,11 @@ class Evict(commands.AutoShardedBot, commands.Cog):
 
     async def on_command(self, ctx: Context) -> None:
         """Custom on_command method that logs command usage."""
-        if not (ctx.guild and ctx.command):
-            if not ctx.guild:
-                return
-
+        command_name = None
+        
+        if ctx.command:
+            command_name = ctx.command.qualified_name
+        elif ctx.guild:
             custom_command = await self.db.fetchrow(
                 """
                 SELECT word 
@@ -355,16 +376,35 @@ class Evict(commands.AutoShardedBot, commands.Cog):
                 ctx.invoked_with.lower()
             )
             
-            if not custom_command:
-                return
-                
-            ctx.command = type('CustomCommand', (), {
-                'qualified_name': f"wordstats_{ctx.invoked_with}",
-                'cog_name': "Utility"
-            })
-
-        await self._track_command_usage(ctx)
+            if custom_command:
+                command_name = f"wordstats_{ctx.invoked_with}"
         
+        if not command_name:
+            command_name = ctx.invoked_with.lower()
+
+        record_duration = self.monitoring.time_command(command_name)
+        self.monitoring.record_command(
+            command_name,
+            str(ctx.guild.id) if ctx.guild else "DM"
+        )
+
+        with self.tracer.start_as_current_span("command_execution") as span:
+            span.set_attribute("command", command_name)
+            span.set_attribute("user_id", str(ctx.author.id))
+            span.set_attribute("guild_id", str(ctx.guild.id) if ctx.guild else "DM")
+            span.set_attribute("channel_id", str(ctx.channel.id))
+            span.set_attribute("success", True) 
+            
+            try:
+                if ctx.command: 
+                    await self._track_command_usage(ctx)
+            except Exception as e:
+                span.set_attribute("success", False)
+                span.set_attribute("error", str(e))
+                raise
+            finally:
+                record_duration()
+
     async def _track_command_usage(self, ctx: Context) -> None:
         """Track command usage statistics."""
         command_name = ctx.command.qualified_name
@@ -716,13 +756,22 @@ class Evict(commands.AutoShardedBot, commands.Cog):
         else:
             return await ctx.send_help(ctx.command)
 
-    async def get_context(self, origin: Message | Interaction, /, *, cls=Context) -> Context:
-        """Get context with additional attributes."""
+    async def get_context(
+        self,
+        origin: Message | Interaction,
+        /,
+        *,
+        cls=Context,
+    ) -> Context:
+        """
+        Custom get_context method that adds additional attributes.
+        """
         context = await super().get_context(origin, cls=cls)
-        if context.guild:
+        if context.guild: 
             context.settings = await Settings.fetch(self, context.guild)
         else:
-            context.settings = None
+            context.settings = None  
+
         return context
 
     async def check_global_cooldown(self, ctx: Context) -> bool:
@@ -892,37 +941,77 @@ class Evict(commands.AutoShardedBot, commands.Cog):
     def _load_translations(self):
         """Load all translation files."""
         langs_dir = Path("langs")
-        for lang_dir in langs_dir.iterdir():
-            if not lang_dir.is_dir():
+        for category_dir in langs_dir.iterdir():
+            if not category_dir.is_dir():
                 continue
                 
-            lang_code = lang_dir.name
-            self.translations[lang_code] = {}
+            category = category_dir.name
+            self.translations[category] = {}
             
-            for category_dir in lang_dir.iterdir():
-                if not category_dir.is_dir():
-                    continue
-                    
-                category = category_dir.name
-                self.translations[lang_code][category] = {}
+            direct_file = category_dir / "ar-Latn.json"
+            if direct_file.is_file():
+                try:
+                    with direct_file.open(encoding='utf-8') as f:
+                        self.translations[category].update(json.load(f))
+                except Exception as e:
+                    log.error(f"Error loading translation file {direct_file}: {e}")
                 
-                for json_file in category_dir.glob("*.json"):
-                    try:
-                        with json_file.open(encoding='utf-8') as f:
-                            self.translations[lang_code][category].update(json.load(f))
-                    except Exception as e:
-                        log.error(f"Error loading translation file {json_file}: {e}")
+            for json_file in category_dir.rglob("ar-Latn.json"):
+                if json_file == direct_file: 
+                    continue
+                
+                try:
+                    with json_file.open(encoding='utf-8') as f:
+                        rel_path = json_file.relative_to(category_dir).parent
+                        
+                        current = self.translations[category]
+                        for part in rel_path.parts:
+                            if part != "ar-Latn.json":
+                                current.setdefault(part, {})
+                                current = current[part]
                             
-        log.info(f"Loaded {len(self.translations)} languages")
+                        current.update(json.load(f))
+                except Exception as e:
+                    log.error(f"Error loading translation file {json_file}: {e}")
+                
+        log.info(f"Loaded translations for {len(self.translations)} categories")
 
-    def get_text(self, lang_code: str, category: str, key: str, **kwargs) -> str:
-        """Get translated text with parameter substitution."""
+    def get_text(self, path: str, **kwargs) -> str:
+        """
+        Get translated text with parameter substitution.
+        Path format: 'category.key.subkey.value'
+        """
         try:
-            text = self.translations[lang_code][category][key]
-            return text.format(**kwargs) if kwargs else text
-        except KeyError:
-            log.warning(f"Missing translation: {lang_code}/{category}/{key}")
-            return f"Missing translation: {key}"
+            parts = path.split('.')
+            current = self.translations['ar-Latn']
+            
+            for part in parts[:-1]: 
+                current = current[part]
+            
+            if parts[-1] in current:
+                result = current[parts[-1]]
+                if isinstance(result, str):
+                    return result.format(**kwargs) if kwargs else result
+                elif isinstance(result, dict):
+                    if 'description' in result:
+                        return result['description'].format(**kwargs) if kwargs else result['description']
+                    
+            raise KeyError(f"No valid text found at path: {path}")
+            
+        except (KeyError, AttributeError) as e:
+            try:
+                parts = path.split('.')
+                current = self.translations
+                for part in parts:
+                    current = current[part]
+                if isinstance(current, str):
+                    return current.format(**kwargs) if kwargs else current
+                elif isinstance(current, dict):
+                    if 'description' in current:
+                        return current['description'].format(**kwargs) if kwargs else current['description']
+            except (KeyError, AttributeError):
+                log.warning(f"Missing translation: {path}")
+                return f"Missing translation: {path}"
 
     async def process_image(self, buffer: bytes, effect_type: str, **kwargs) -> Any:
         """Process image effects using process pool."""

@@ -365,7 +365,6 @@ class Context(OriginalContext):
         delete_after: bool = False,
         patch: Optional[Message] = None,
         *args: Any,
-        **kwargs: Any,
     ) -> Message:
         """
         Sends a neutral message, or edits an existing message if patch is provided.
@@ -378,7 +377,7 @@ class Context(OriginalContext):
             await quietly_delete(message)
 
         embed = Embed(
-            color=kwargs.pop("color", config.COLORS.NEUTRAL),
+            color=config.COLORS.NEUTRAL,
             description=f"{self.author.mention}: {message}",
         )
 

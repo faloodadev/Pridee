@@ -48,3 +48,11 @@ wand
 aiomisc
 xxhash
 pomice
+scipy
+GitPython==3.1.41
+dateparser
+
+opentelemetry-exporter-jaeger
+opentelemetry-instrumentation-requests
+opentelemetry-instrumentation-aiohttp-client
+opentelemetry.exporter.prometheus
