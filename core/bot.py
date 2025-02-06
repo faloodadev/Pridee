@@ -361,11 +361,10 @@ class Evict(commands.AutoShardedBot, commands.Cog):
 
     async def on_command(self, ctx: Context) -> None:
         """Custom on_command method that logs command usage."""
-        command_name = None
-        
-        if ctx.command:
-            command_name = ctx.command.qualified_name
-        elif ctx.guild:
+        if not ctx.guild:
+            return
+
+        if not ctx.command: 
             custom_command = await self.db.fetchrow(
                 """
                 SELECT word 
@@ -377,72 +376,66 @@ class Evict(commands.AutoShardedBot, commands.Cog):
             )
             
             if custom_command:
-                command_name = f"wordstats_{ctx.invoked_with}"
-        
-        if not command_name:
-            command_name = ctx.invoked_with.lower()
+                ctx.command = type('CustomCommand', (), {
+                    'qualified_name': f"wordstats_{ctx.invoked_with}",
+                    'cog_name': "Utility"
+                })
+            else:
+                return 
 
-        record_duration = self.monitoring.time_command(command_name)
-        self.monitoring.record_command(
-            command_name,
-            str(ctx.guild.id) if ctx.guild else "DM"
-        )
+        start_time = time.time()
+        command_name = ctx.command.qualified_name
 
-        with self.tracer.start_as_current_span("command_execution") as span:
-            span.set_attribute("command", command_name)
-            span.set_attribute("user_id", str(ctx.author.id))
-            span.set_attribute("guild_id", str(ctx.guild.id) if ctx.guild else "DM")
-            span.set_attribute("channel_id", str(ctx.channel.id))
-            span.set_attribute("success", True) 
-            
-            try:
-                if ctx.command: 
-                    await self._track_command_usage(ctx)
-            except Exception as e:
-                span.set_attribute("success", False)
-                span.set_attribute("error", str(e))
-                raise
-            finally:
-                record_duration()
+        try:
+            await self._track_command_usage(ctx)
+
+            log.info(
+                "%s (%s) used %s in %s (%s)",
+                ctx.author.name,
+                ctx.author.id,
+                ctx.command.qualified_name,
+                ctx.guild.name,
+                ctx.guild.id,
+            )
+
+        except Exception as e:
+            log.error(f"Error in on_command: {e}")
+
+        finally:
+            elapsed = time.time() - start_time
+            if not hasattr(self, 'command_stats'):
+                self.command_stats = defaultdict(lambda: {'calls': 0, 'total_time': 0})
+                
+            self.command_stats[command_name]['calls'] += 1
+            self.command_stats[command_name]['total_time'] += elapsed
 
     async def _track_command_usage(self, ctx: Context) -> None:
         """Track command usage statistics."""
-        command_name = ctx.command.qualified_name
-        
         try:
             async with self.db.acquire() as conn:
                 await conn.execute(
                     """
-                    INSERT INTO command_usage (
-                        user_id, command_name, guild_id, channel_id, 
-                        used_at, failed, error_reason
-                    )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    INSERT INTO statistics.daily 
+                        (guild_id, date, member_id, messages_sent)
+                    VALUES 
+                        ($1, CURRENT_DATE, $2, 0)
+                    ON CONFLICT (guild_id, date, member_id) DO UPDATE SET 
+                        messages_sent = statistics.daily.messages_sent
                     """,
-                    ctx.author.id,
-                    command_name,
-                    ctx.guild.id if ctx.guild else None,
-                    ctx.channel.id,
-                    ctx.message.created_at,
-                    False,
-                    None
+                    ctx.guild.id,
+                    ctx.author.id
                 )
                 
                 await conn.execute(
                     """
-                    INSERT INTO metrics (
-                        user_id, user_name, command_name, 
-                        guild_id, guild_name
-                    )
-                    VALUES ($1, $2, $3, $4, $5)
-                    ON CONFLICT (user_id, command_name, guild_id) 
-                    DO UPDATE SET uses = metrics.uses + 1
+                    INSERT INTO invoke_history.commands 
+                    (guild_id, user_id, command_name, category, timestamp)
+                    VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
                     """,
+                    ctx.guild.id,
                     ctx.author.id,
-                    ctx.author.name,
-                    command_name,
-                    ctx.guild.id if ctx.guild else None,
-                    ctx.guild.name if ctx.guild else None
+                    ctx.command.qualified_name,
+                    ctx.command.cog_name or "No Category",
                 )
         except Exception as e:
             log.error(f"Error tracking command usage: {e}")
