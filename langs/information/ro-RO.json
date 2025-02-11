@@ -1,0 +1,54 @@
+{
+    "language_code": "Romanian",
+    "language": "Romanian",
+    "language_local": "ro-RO",
+        "invite": {
+            "DESCRIPTION": "Obține un link de invitație pentru bot"
+        },
+        "discord": {
+            "DESCRIPTION": "Obține un link catre server-ul de support al bot-ului"
+        },
+        "about": {
+            "DESCRIPTION": "Vizualizează informații despre bot",
+            "EMBED": {
+                "DESCRIPTION_LINE_ONE": "Dezvoltat și menținut de [x](https://discord.com/users/598125772754124823), [adam](https://discord.com/users/930383131863842816), [harry](https://discordapp.com/users/187747524646404105)",
+                "DESCRIPTION_LINE_TWO": "`{cached_commands}` de comenzi în  `{total_cogs}`  cog-uri  (`{extended_cogs}` de module in total)",
+                "FOOTER": "evict/v{version} • Ultimul Commit: {latest_commit}"
+            }
+        },
+        "ping": {
+            "DESCRIPTION": "Verifică latența bot-ului",
+            "INITAL_EMBED": {
+                "description": "pinging..."
+            },
+            "UPDATED_EMBED": {
+                "description": "`{ping}ms` (edit: `{edit_ping}ms`)"
+            }
+        },
+        "poll": {
+            "DESCRIPTION": "Comenzi pentru gestionare a sondajelor",
+            "create": {
+                "DESCRIPTION": "Creează un nou sondaj folosind argumentele",
+                "CANCELLED": "Crearea sondajului a fost anulată.",
+                "INVALID_DURATION": "Formata duratei este invalidă. Foloseste 1h, 1d, etc."
+            },
+            "quick": {
+                "DESCRIPTION": "Creează un sondaj rapid folosind da/nu sau optiuni customizate"
+            },
+            "list": {
+                "DESCRIPTION": "Listează toate sondajele active din acest server",
+                "NO_POLLS": {
+                    "DEFAULT": "Nu a fost găsit niciun sondaj activ!",
+                    "FILTERED": "Niciun sondaj activ găsit la {creator}!"
+                },
+                "ENTRY": {
+                    "TITLE": "**{title}**",
+                    "CREATOR": "Creat de: {creator}",
+                    "VOTES": "Voturi: {count}",
+                    "ID": "ID: `{id}`",
+                    "CREATED": "Creat: {time}",
+                    "ENDS": "Sfârșește: {time}"
+                }
+            }
+        }
+    }

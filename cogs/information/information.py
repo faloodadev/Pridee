@@ -245,20 +245,19 @@ class Information(Cog):
 
     @hybrid_command(aliases=["beep"])
     async def ping(self, ctx: Context) -> None:
-        """
-        View the bot's latency.
-        """
+        """View the bot's latency."""
         latency = round(self.bot.latency * 1000)
         start_time = time.time()
         message = await ctx.neutral(
-            self.bot.get_text("information.ping.INITIAL_EMBED.description")
+            await self.bot.get_text("information.ping.INITIAL_EMBED.description", ctx)
         )
         end_time = time.time()
         edit_latency = round((end_time - start_time) * 1000)
         
         return await ctx.neutral(
-            message=self.bot.get_text(
+            message=await self.bot.get_text(
                 "information.ping.UPDATED_EMBED.description",
+                ctx,
                 ping=latency,
                 edit_ping=edit_latency
             ),
@@ -338,10 +337,12 @@ class Information(Cog):
         }
 
         embed = Embed(
-            description=self.bot.get_text(
-                "information.about.EMBED.DESCRIPTION_LINE_ONE"
-            ) + "\n" + self.bot.get_text(
+            description=await self.bot.get_text(
+                "information.about.EMBED.DESCRIPTION_LINE_ONE",
+                ctx
+            ) + "\n" + await self.bot.get_text(
                 "information.about.EMBED.DESCRIPTION_LINE_TWO",
+                ctx,
                 cached_commands=self._cached_commands,
                 total_cogs=len(self.bot.cogs),
                 extended_cogs=total_modules
@@ -414,8 +415,9 @@ class Information(Cog):
         view.add_item(button3)
 
         embed.set_footer(
-            text=self.bot.get_text(
+            text=await self.bot.get_text(
                 "information.about.EMBED.FOOTER",
+                ctx,
                 version=self.bot.version,
                 latest_commit=self._cached_commit
             )
@@ -448,8 +450,9 @@ class Information(Cog):
             description=f"{format_dt(guild.created_at)} ({format_dt(guild.created_at, 'R')})"
         )
         embed.set_author(
-            name=self.bot.get_text(
+            name=await self.bot.get_text(
                 "information.inviteinfo.EMBED.AUTHOR",
+                ctx,
                 guild_name=guild.name,
                 guild_id=guild.id
             ),
@@ -461,18 +464,20 @@ class Information(Cog):
             embed.color = await dominant_color(buffer)
 
         embed.add_field(
-            name=self.bot.get_text("information.inviteinfo.EMBED.FIELDS.INFORMATION.NAME"),
-            value=self.bot.get_text(
+            name=await self.bot.get_text("information.inviteinfo.EMBED.FIELDS.INFORMATION.NAME", ctx),
+            value=await self.bot.get_text(
                 "information.inviteinfo.EMBED.FIELDS.INFORMATION.VALUE",
+                ctx,
                 inviter=invite.inviter or 'Vanity URL',
                 channel=invite.channel or 'Unknown',
                 created_at=format_dt(invite.created_at or guild.created_at)
             ),
         )
         embed.add_field(
-            name=self.bot.get_text("information.inviteinfo.EMBED.FIELDS.GUILD.NAME"),
-            value=self.bot.get_text(
+            name=await self.bot.get_text("information.inviteinfo.EMBED.FIELDS.GUILD.NAME", ctx),
+            value=await self.bot.get_text(
                 "information.inviteinfo.EMBED.FIELDS.GUILD.VALUE",
+                ctx,
                 member_count=invite.approximate_member_count,
                 online_count=invite.approximate_presence_count,
                 verification_level=guild.verification_level.name.title()
@@ -499,7 +504,7 @@ class Information(Cog):
             else ctx.guild
         )
         if not guild.banner:
-            return await ctx.warn(self.bot.get_text("information.server.BANNER_MISSING", guild=guild))
+            return await ctx.warn(await self.bot.get_text("information.server.BANNER_MISSING", ctx, guild=guild))
 
         embed = Embed(
             url=guild.banner,
@@ -527,7 +532,7 @@ class Information(Cog):
             else ctx.guild
         )
         if not guild.icon:
-            return await ctx.warn(self.bot.get_text("information.server.ICON_MISSING", guild=guild))
+            return await ctx.warn(await self.bot.get_text("information.server.ICON_MISSING", ctx, guild=guild))
 
         embed = Embed(
             url=guild.icon,
@@ -565,9 +570,10 @@ class Information(Cog):
 
         embed = Embed(
             url=user.avatar or user.default_avatar,
-            title=self.bot.get_text(
+            title=await self.bot.get_text(
                 "information.avatar.TITLE.SELF" if user == ctx.author 
                 else "information.avatar.TITLE.OTHER",
+                ctx,
                 user_name=user.name
             ),
         )
@@ -599,18 +605,20 @@ class Information(Cog):
         member = member or ctx.author
         if not member.guild_avatar:
             return await ctx.warn(
-                self.bot.get_text(
+                await self.bot.get_text(
                     "information.serveravatar.MISSING.SELF" if member == ctx.author
                     else "information.serveravatar.MISSING.OTHER",
+                    ctx,
                     member=member
                 )
             )
 
         embed = Embed(
             url=member.guild_avatar,
-            title=self.bot.get_text(
+            title=await self.bot.get_text(
                 "information.serveravatar.TITLE.SELF" if member == ctx.author
                 else "information.serveravatar.TITLE.OTHER",
+                ctx,
                 member_name=member.name
             ),
         )
@@ -639,18 +647,20 @@ class Information(Cog):
         member = member or ctx.author
         if not member.guild_banner:
             return await ctx.warn(
-                self.bot.get_text(
+                await self.bot.get_text(
                     "information.memberbanner.MISSING.SELF" if member == ctx.author
                     else "information.memberbanner.MISSING.OTHER",
+                    ctx,
                     member=member
                 )
             )
 
         embed = Embed(
             url=member.guild_banner,
-            title=self.bot.get_text(
+            title=await self.bot.get_text(
                 "information.memberbanner.TITLE.SELF" if member == ctx.author
                 else "information.memberbanner.TITLE.OTHER",
+                ctx,
                 member_name=member.name
             ),
         )
@@ -677,9 +687,10 @@ class Information(Cog):
 
         if not fetched_user.banner:
             return await ctx.warn(
-                self.bot.get_text(
+                await self.bot.get_text(
                     "information.banner.MISSING.SELF" if user == ctx.author
                     else "information.banner.MISSING.OTHER",
+                    ctx,
                     user=user
                 )
             )
@@ -715,15 +726,15 @@ class Information(Cog):
         bots = list(list(filter(lambda member: member.bot, guild.members)))
 
         embed.add_field(
-            name=self.bot.get_text("information.membercount.FIELDS.MEMBERS"), 
+            name=await self.bot.get_text("information.membercount.FIELDS.MEMBERS", ctx), 
             value=f"{len(guild.members):,}"
         )
         embed.add_field(
-            name=self.bot.get_text("information.membercount.FIELDS.HUMANS"), 
+            name=await self.bot.get_text("information.membercount.FIELDS.HUMANS", ctx), 
             value=f"{len(humans):,}"
         )
         embed.add_field(
-            name=self.bot.get_text("information.membercount.FIELDS.BOTS"), 
+            name=await self.bot.get_text("information.membercount.FIELDS.BOTS", ctx), 
             value=f"{len(bots):,}"
         )
 
@@ -767,7 +778,7 @@ class Information(Cog):
             )
 
         if not target_guild:
-            return await ctx.warn(self.bot.get_text("information.serverinfo.ERRORS.NOT_FOUND"))
+            return await ctx.warn(await self.bot.get_text("information.serverinfo.ERRORS.NOT_FOUND", ctx))
 
         embed = Embed(
             description=f"{format_dt(target_guild.created_at)} ({format_dt(target_guild.created_at, 'R')})"
@@ -782,9 +793,10 @@ class Information(Cog):
             embed.color = await dominant_color(buffer)
 
         embed.add_field(
-            name=self.bot.get_text("information.serverinfo.EMBED.FIELDS.INFORMATION.NAME"),
-            value=self.bot.get_text(
+            name=await self.bot.get_text("information.serverinfo.EMBED.FIELDS.INFORMATION.NAME", ctx),
+            value=await self.bot.get_text(
                 "information.serverinfo.EMBED.FIELDS.INFORMATION.VALUE",
+                ctx,
                 owner=target_guild.owner or target_guild.owner_id,
                 verification=target_guild.verification_level.name.title(),
                 boost_count=target_guild.premium_subscription_count,
@@ -792,9 +804,10 @@ class Information(Cog):
             ),
         )
         embed.add_field(
-            name=self.bot.get_text("information.serverinfo.EMBED.FIELDS.STATISTICS.NAME"),
-            value=self.bot.get_text(
+            name=await self.bot.get_text("information.serverinfo.EMBED.FIELDS.STATISTICS.NAME", ctx),
+            value=await self.bot.get_text(
                 "information.serverinfo.EMBED.FIELDS.STATISTICS.VALUE",
+                ctx,
                 member_count=target_guild.member_count,
                 text_channels=len(target_guild.text_channels),
                 voice_channels=len(target_guild.voice_channels)
@@ -805,8 +818,9 @@ class Information(Cog):
             roles = list(reversed(roles))
 
             embed.add_field(
-                name=self.bot.get_text(
+                name=await self.bot.get_text(
                     "information.serverinfo.EMBED.FIELDS.ROLES.NAME",
+                    ctx,
                     role_count=len(roles)
                 ),
                 value=(
@@ -825,7 +839,7 @@ class Information(Cog):
     @discord.app_commands.default_permissions(use_application_commands=True)
     async def userinfo(self, ctx: Context, *, user: Member | User = parameter(default=lambda ctx: ctx.author)) -> Message:
         embed = Embed(color=user.color if user.color != Colour.default() else ctx.color)
-        embed.title = self.bot.get_text("information.userinfo.TITLE", user=user, bot_tag="[BOT]" if user.bot else "")
+        embed.title = await self.bot.get_text("information.userinfo.TITLE", ctx, user=user, bot_tag="[BOT]" if user.bot else "")
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         embed.description = ""
 
@@ -873,29 +887,29 @@ class Information(Cog):
                 embed.description = f"{' '.join(badges)}"
 
         embed.set_thumbnail(url=user.display_avatar)
-        embed.set_footer(text=self.bot.get_text("information.userinfo.FOOTER", count=len(user.mutual_guilds)))
+        embed.set_footer(text=await self.bot.get_text("information.userinfo.FOOTER", ctx, count=len(user.mutual_guilds)))
 
         embed.add_field(
-            name=self.bot.get_text("information.userinfo.FIELDS.CREATED"),
+            name=await self.bot.get_text("information.userinfo.FIELDS.CREATED", ctx),
             value=f"{format_dt(user.created_at, 'D')}\n> {format_dt(user.created_at, 'R')}",
         )
 
         if isinstance(user, Member) and user.joined_at:
             join_pos = sorted(user.guild.members, key=lambda member: member.joined_at or utcnow()).index(user)
             embed.add_field(
-                name=self.bot.get_text("information.userinfo.FIELDS.JOINED", position=ordinal(join_pos + 1)),
+                name=await self.bot.get_text("information.userinfo.FIELDS.JOINED", ctx, position=ordinal(join_pos + 1)),
                 value=f"{format_dt(user.joined_at, 'D')}\n> {format_dt(user.joined_at, 'R')}",
             )
 
             if user.premium_since:
                 embed.add_field(
-                    name=self.bot.get_text("information.userinfo.FIELDS.BOOSTED"),
+                    name=await self.bot.get_text("information.userinfo.FIELDS.BOOSTED", ctx),
                     value=f"{format_dt(user.premium_since, 'D')}\n> {format_dt(user.premium_since, 'R')}",
                 )
 
             if roles := user.roles[1:]:
                 embed.add_field(
-                    name=self.bot.get_text("information.userinfo.FIELDS.ROLES"),
+                    name=await self.bot.get_text("information.userinfo.FIELDS.ROLES", ctx),
                     value=", ".join(role.mention for role in list(reversed(roles))[:5])
                     + (f" (+{len(roles) - 5})" if len(roles) > 5 else ""),
                     inline=False,
@@ -904,11 +918,12 @@ class Information(Cog):
             if (voice := user.voice) and voice.channel:
                 members = len(voice.channel.members) - 1
                 with_others = (
-                    self.bot.get_text("information.userinfo.VOICE.WITH_OTHERS", count=members)
-                    if members else self.bot.get_text("information.userinfo.VOICE.ALONE")
+                    await self.bot.get_text("information.userinfo.VOICE.WITH_OTHERS", ctx, count=members)
+                    if members else await self.bot.get_text("information.userinfo.VOICE.ALONE", ctx)
                 )
-                embed.description += self.bot.get_text(
+                embed.description += await self.bot.get_text(
                     "information.userinfo.VOICE.STREAMING" if voice.self_stream else "information.userinfo.VOICE.NORMAL",
+                    ctx,
                     channel=voice.channel.mention,
                     with_others=with_others
                 )
@@ -917,25 +932,29 @@ class Information(Cog):
                 activities = list(activities)
                 if isinstance(activities[0], Spotify):
                     activity = activities[0]
-                    embed.description += "\n" + self.bot.get_text(
+                    embed.description += "\n" + await self.bot.get_text(
                         "information.userinfo.ACTIVITIES.SPOTIFY",
+                        ctx,
                         title=activity.title,
                         url=activity.track_url,
                         artist=activity.artists[0]
                     )
                 elif isinstance(activities[0], Streaming):
-                    embed.description += "\n" + self.bot.get_text(
+                    embed.description += "\n" + await self.bot.get_text(
                         "information.userinfo.ACTIVITIES.STREAMING",
+                        ctx,
                         activities=human_join([f"[**{activity.name}**]({activity.url})" for activity in activities], final="and")
                     )
                 elif activity_type == ActivityType.playing:
-                    embed.description += "\n" + self.bot.get_text(
+                    embed.description += "\n" + await self.bot.get_text(
                         "information.userinfo.ACTIVITIES.PLAYING",
+                        ctx,
                         activities=human_join([f"**{activity.name}**" for activity in activities], final="and")
                     )
                 elif activity_type == ActivityType.watching:
-                    embed.description += "\n" + self.bot.get_text(
+                    embed.description += "\n" + await self.bot.get_text(
                         "information.userinfo.ACTIVITIES.WATCHING",
+                        ctx,
                         activities=human_join([f"**{activity.name}**" for activity in activities], final="and")
                     )
 
@@ -977,7 +996,7 @@ class Information(Cog):
             user.id,
         )
         if not names:
-            return await ctx.warn(f"**{user}** doesn't have any name history!")
+            return await ctx.warn(await self.bot.get_text("information.namehistory.NO_HISTORY", ctx, user=user))
 
         paginator = Paginator(
             ctx,
@@ -985,7 +1004,7 @@ class Information(Cog):
                 f"**{record['username']}** ({format_dt(record['changed_at'], 'R')})"
                 for record in names
             ],
-            embed=Embed(title="Name History"),
+            embed=Embed(title=await self.bot.get_text("information.namehistory.TITLE", ctx)),
         )
         return await paginator.start()
 
@@ -1007,7 +1026,7 @@ class Information(Cog):
             ctx.author.id,
         )
 
-        return await ctx.approve("Successfully cleared your name history")
+        return await ctx.approve(await self.bot.get_text("information.namehistory.clear.SUCCESS", ctx))
 
     @hybrid_command(
         aliases=[
@@ -1031,9 +1050,10 @@ class Information(Cog):
         member = member or ctx.author
         if member.status == Status.offline:
             return await ctx.warn(
-                self.bot.get_text(
+                await self.bot.get_text(
                     "information.devices.OFFLINE.SELF" if member == ctx.author 
                     else "information.devices.OFFLINE.OTHER",
+                    ctx,
                     member=member
                 )
             )
@@ -1046,9 +1066,10 @@ class Information(Cog):
         }
 
         embed = Embed(
-            title=self.bot.get_text(
+            title=await self.bot.get_text(
                 "information.devices.TITLE.SELF" if member == ctx.author
                 else "information.devices.TITLE.OTHER",
+                ctx,
                 member_name=member.name
             )
         )
@@ -1058,32 +1079,37 @@ class Information(Cog):
             activities = list(activities)
             if isinstance(activities[0], Spotify):
                 activity = activities[0]
-                embed.description += "\n" + self.bot.get_text(
+                embed.description += "\n" + await self.bot.get_text(
                     "information.devices.ACTIVITIES.SPOTIFY",
+                    ctx,
                     title=activity.title,
                     url=activity.track_url,
                     artist=activity.artists[0]
                 )
             elif isinstance(activities[0], Streaming):
-                embed.description += "\n" + self.bot.get_text(
+                embed.description += "\n" + await self.bot.get_text(
                     "information.devices.ACTIVITIES.STREAMING",
+                    ctx,
                     activities=human_join([f"[**{activity.name}**]({activity.url})" for activity in activities], final="and")
                 )
             elif activity_type == ActivityType.playing:
-                embed.description += "\n" + self.bot.get_text(
+                embed.description += "\n" + await self.bot.get_text(
                     "information.devices.ACTIVITIES.PLAYING",
+                    ctx,
                     activities=human_join([f"**{activity.name}**" for activity in activities], final="and")
                 )
 
             elif activity_type == ActivityType.watching:
-                embed.description += "\n" + self.bot.get_text(
+                embed.description += "\n" + await self.bot.get_text(
                     "information.devices.ACTIVITIES.WATCHING",
+                    ctx,
                     activities=human_join([f"**{activity.name}**" for activity in activities], final="and")
                 )
 
             elif activity_type == ActivityType.competing:
-                embed.description += "\n" + self.bot.get_text(
+                embed.description += "\n" + await self.bot.get_text(
                     "information.devices.ACTIVITIES.COMPETING",
+                    ctx,
                     activities=human_join([f"**{activity.name}**" for activity in activities], final="and")
                 )
 
@@ -1109,12 +1135,12 @@ class Information(Cog):
 
         roles = reversed(ctx.guild.roles[1:])
         if not roles:
-            return await ctx.warn(self.bot.get_text("information.roles.NO_ROLES", guild=ctx.guild))
+            return await ctx.warn(await self.bot.get_text("information.roles.NO_ROLES", ctx, guild=ctx.guild))
 
         paginator = Paginator(
             ctx,
             entries=[f"{role.mention} (`{role.id}`)" for role in roles],
-            embed=Embed(title=self.bot.get_text("information.roles.TITLE", guild=ctx.guild)),
+            embed=Embed(title=await self.bot.get_text("information.roles.TITLE", ctx, guild=ctx.guild)),
         )
         return await paginator.start()
 
@@ -1122,12 +1148,12 @@ class Information(Cog):
     async def inrole(self, ctx: Context, *, role: Role) -> Message:
         members = role.members
         if not members:
-            return await ctx.warn(self.bot.get_text("information.inrole.NO_MEMBERS", role=role.mention))
+            return await ctx.warn(await self.bot.get_text("information.inrole.NO_MEMBERS", ctx, role=role.mention))
 
         paginator = Paginator(
             ctx,
             entries=[f"{member.mention} (`{member.id}`)" for member in members],
-            embed=Embed(title=self.bot.get_text("information.inrole.TITLE", role=role)),
+            embed=Embed(title=await self.bot.get_text("information.inrole.TITLE", ctx, role=role)),
         )
         return await paginator.start()
 
@@ -1144,7 +1170,7 @@ class Information(Cog):
             )
         )
         if not members:
-            return await ctx.warn(self.bot.get_text("information.boosters.NO_BOOSTERS"))
+            return await ctx.warn(await self.bot.get_text("information.boosters.NO_BOOSTERS", ctx))
 
         paginator = Paginator(
             ctx,
@@ -1152,7 +1178,7 @@ class Information(Cog):
                 f"{member.mention} - boosted {format_dt(member.premium_since or utcnow(), 'R')}"
                 for member in sorted(members, key=lambda member: member.premium_since or utcnow(), reverse=True)
             ],
-            embed=Embed(title=self.bot.get_text("information.boosters.TITLE")),
+            embed=Embed(title=await self.bot.get_text("information.boosters.TITLE", ctx)),
         )
         return await paginator.start()
 
@@ -1164,23 +1190,18 @@ class Information(Cog):
         users = [
             f"{user.mention} stopped {format_dt(record['ended_at'], 'R')} (lasted {short_timespan(record['lasted_for'])})"
             for record in await self.bot.db.fetch(
-                """
-                SELECT *
-                FROM boosters_lost
-                WHERE guild_id = $1
-                ORDER BY ended_at DESC
-                """,
+                "SELECT * FROM boosters_lost WHERE guild_id = $1 ORDER BY ended_at DESC",
                 ctx.guild.id,
             )
             if (user := self.bot.get_user(record["user_id"]))
         ]
         if not users:
-            return await ctx.warn(self.bot.get_text("information.boosters.lost.NO_LOST"))
+            return await ctx.warn(await self.bot.get_text("information.boosters.lost.NO_LOST", ctx))
 
         paginator = Paginator(
             ctx,
             entries=users,
-            embed=Embed(title=self.bot.get_text("information.boosters.lost.TITLE")),
+            embed=Embed(title=await self.bot.get_text("information.boosters.lost.TITLE", ctx)),
         )
         return await paginator.start()
 
@@ -1196,23 +1217,15 @@ class Information(Cog):
             )
         )
         if not members:
-            return await ctx.warn(
-                self.bot.get_text("information.bots.NO_BOTS", guild=ctx.guild)
-            )
+            return await ctx.warn(await self.bot.get_text("information.bots.NO_BOTS", ctx, guild=ctx.guild))
 
         paginator = Paginator(
             ctx,
             entries=[
                 f"{member.mention} (`{member.id}`)"
-                for member in sorted(
-                    members,
-                    key=lambda member: member.joined_at or utcnow(),
-                    reverse=True,
-                )
+                for member in sorted(members, key=lambda member: member.joined_at or utcnow(), reverse=True)
             ],
-            embed=Embed(
-                title=self.bot.get_text("information.bots.TITLE", guild=ctx.guild)
-            ),
+            embed=Embed(title=await self.bot.get_text("information.bots.TITLE", ctx, guild=ctx.guild)),
         )
         return await paginator.start()
     
@@ -1227,17 +1240,12 @@ class Information(Cog):
             bans.append(ban)
 
         if not bans:
-            return await ctx.warn(self.bot.get_text("information.banlist.NO_BANS"))
+            return await ctx.warn(await self.bot.get_text("information.banlist.NO_BANS", ctx))
 
         paginator = Paginator(
             ctx,
-            entries=[
-                f"{ban.user.mention} (`{ban.user.id}`) - {ban.reason or 'No reason'}"
-                for ban in bans
-            ],
-            embed=Embed(
-                title=self.bot.get_text("information.banlist.TITLE", count=len(bans))
-            ),
+            entries=[f"{ban.user.mention} (`{ban.user.id}`) - {ban.reason or 'No reason'}" for ban in bans],
+            embed=Embed(title=await self.bot.get_text("information.banlist.TITLE", ctx, count=len(bans))),
         )
         
         return await paginator.start()
@@ -1250,7 +1258,7 @@ class Information(Cog):
         """
         invites = await ctx.guild.invites()
         if not invites:
-            return await ctx.warn(self.bot.get_text("information.guildinvites.NO_INVITES"))
+            return await ctx.warn(await self.bot.get_text("information.guildinvites.NO_INVITES", ctx))
 
         paginator = Paginator(
             ctx,
@@ -1258,7 +1266,7 @@ class Information(Cog):
                 f"[{invite.code}]({invite.url}) by {invite.inviter.mention if invite.inviter else '**Unknown**'} expires {format_dt(invite.expires_at, 'R') if invite.expires_at else '**Never**'}"
                 for invite in sorted(invites, key=lambda invite: invite.created_at or utcnow(), reverse=True)
             ],
-            embed=Embed(title=self.bot.get_text("information.guildinvites.TITLE", guild=ctx.guild)),
+            embed=Embed(title=await self.bot.get_text("information.guildinvites.TITLE", ctx, guild=ctx.guild)),
         )
         return await paginator.start()
 
@@ -1270,12 +1278,12 @@ class Information(Cog):
 
         emojis = ctx.guild.emojis
         if not emojis:
-            return await ctx.warn(self.bot.get_text("information.emojis.NO_EMOJIS", guild=ctx.guild))
+            return await ctx.warn(await self.bot.get_text("information.emojis.NO_EMOJIS", ctx, guild=ctx.guild))
 
         paginator = Paginator(
             ctx,
             entries=[f"{emoji} ([`{emoji.id}`]({emoji.url}))" for emoji in emojis],
-            embed=Embed(title=self.bot.get_text("information.emojis.TITLE", guild=ctx.guild)),
+            embed=Embed(title=await self.bot.get_text("information.emojis.TITLE", ctx, guild=ctx.guild)),
         )
         return await paginator.start()
 
@@ -1286,12 +1294,12 @@ class Information(Cog):
         """
         stickers = ctx.guild.stickers
         if not stickers:
-            return await ctx.warn(self.bot.get_text("information.stickers.NO_STICKERS", guild=ctx.guild))
+            return await ctx.warn(await self.bot.get_text("information.stickers.NO_STICKERS", ctx, guild=ctx.guild))
 
         paginator = Paginator(
             ctx,
             entries=[f"[{sticker.name}]({sticker.url}) (`{sticker.id}`)" for sticker in stickers],
-            embed=Embed(title=self.bot.get_text("information.stickers.TITLE", guild=ctx.guild)),
+            embed=Embed(title=await self.bot.get_text("information.stickers.TITLE", ctx, guild=ctx.guild)),
         )
         return await paginator.start()
 
@@ -1302,7 +1310,7 @@ class Information(Cog):
         """
         message = [message async for message in ctx.channel.history(limit=1, oldest_first=True)][0]
         return await ctx.neutral(
-            self.bot.get_text("information.firstmessage.RESPONSE", url=message.jump_url, author=message.author)
+            await self.bot.get_text("information.firstmessage.RESPONSE", ctx, url=message.jump_url, author=message.author)
         )
 
     @hybrid_command(aliases=["pos"], example="@x")
@@ -1322,8 +1330,7 @@ class Information(Cog):
             + 1
         )
 
-        embed = Embed(description=f"{member.mention} is member number ``{pos}``.")
-
+        embed = Embed(description=await self.bot.get_text("information.position.RESPONSE", ctx, member=member.mention, pos=pos))
         await ctx.send(embed=embed)
 
     @command(example="#general", aliases=["chinfo", "cinfo", "ci"])
@@ -1338,17 +1345,21 @@ class Information(Cog):
         if channel is None:
             channel = ctx.channel
 
-        embed = Embed(title=f"{channel.name}", color=ctx.author.top_role.color)
+        embed = Embed(title=await self.bot.get_text("information.channelinfo.TITLE", ctx, channel=channel.name))
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
 
-        embed.set_author(
-            name=f"{ctx.author.display_name}",
-            icon_url=f"{ctx.author.display_avatar.url}",
+        embed.add_field(
+            name=await self.bot.get_text("information.channelinfo.FIELDS.ID", ctx),
+            value=f"``{channel.id}``",
+            inline=False
         )
 
         embed.add_field(name="Channel ID", value=f"``{channel.id}``", inline=False)
 
         embed.add_field(
-            name="Type", value=f"``{str(channel.type).lower()}``", inline=False
+            name=await self.bot.get_text("information.channelinfo.FIELDS.TYPE", ctx),
+            value=f"``{str(channel.type).lower()}``",
+            inline=False
         )
 
         if isinstance(channel, (TextChannel, VoiceChannel)):
@@ -1356,20 +1367,18 @@ class Information(Cog):
 
             if category:
                 embed.add_field(
-                    name="Category",
+                    name=await self.bot.get_text("information.channelinfo.FIELDS.CATEGORY", ctx),
                     value=f"``{category.name}`` (``{category.id}``)",
-                    inline=False,
+                    inline=False
                 )
             else:
                 embed.add_field(name="Category", value="No category", inline=False)
 
         if isinstance(channel, TextChannel):
             embed.add_field(
-                name="Topic",
-                value=(
-                    f"{channel.topic}" if channel.topic else "No topic on this channel"
-                ),
-                inline=False,
+                name=await self.bot.get_text("information.channelinfo.FIELDS.TOPIC", ctx),
+                value=channel.topic or await self.bot.get_text("information.channelinfo.NO_TOPIC", ctx),
+                inline=False
             )
 
         elif isinstance(channel, CategoryChannel):
@@ -1383,8 +1392,12 @@ class Information(Cog):
 
         embed.add_field(
             name="Created On",
+        )
+            
+        embed.add_field(
+            name=await self.bot.get_text("information.channelinfo.FIELDS.CREATED", ctx),
             value=f"{format_dt(channel.created_at)} ({format_dt(channel.created_at, 'R')})",
-            inline=False,
+            inline=False
         )
 
         await ctx.send(embed=embed)
@@ -1397,16 +1410,16 @@ class Information(Cog):
         if role is None:
             role = ctx.author.top_role
 
-        embed = Embed(title=f"{role.name}", color=role.color)
+        embed = Embed(title=await self.bot.get_text("information.roleinfo.TITLE", ctx, role=role.name))
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         
         embed.add_field(
-            name=self.bot.get_text("information.roleinfo.FIELDS.ID"), 
+            name=await self.bot.get_text("information.roleinfo.FIELDS.ID", ctx), 
             value=f"``{role.id}``", 
             inline=False
         )
         embed.add_field(
-            name=self.bot.get_text("information.roleinfo.FIELDS.COLOR"), 
+            name=await self.bot.get_text("information.roleinfo.FIELDS.COLOR", ctx), 
             value=f"``{role.color}``", 
             inline=False
         )
@@ -1437,18 +1450,14 @@ class Information(Cog):
         
         if granted_permissions:
             embed.add_field(
-                name=self.bot.get_text("information.roleinfo.FIELDS.PERMISSIONS.NAME"),
-                value=(
-                    ", ".join(granted_permissions)
-                    if len(granted_permissions) > 1
-                    else granted_permissions[0]
-                ),
-                inline=False,
+                name=await self.bot.get_text("information.roleinfo.FIELDS.PERMISSIONS.NAME", ctx),
+                value=", ".join(granted_permissions) if len(granted_permissions) > 1 else granted_permissions[0],
+                inline=False
             )
         else:
             embed.add_field(
-                name=self.bot.get_text("information.roleinfo.FIELDS.PERMISSIONS.NAME"),
-                value=self.bot.get_text("information.roleinfo.FIELDS.PERMISSIONS.NONE"),
+                name=await self.bot.get_text("information.roleinfo.FIELDS.PERMISSIONS.NAME", ctx),
+                value=await self.bot.get_text("information.roleinfo.FIELDS.PERMISSIONS.NONE", ctx),
                 inline=False
             )
 
@@ -1457,14 +1466,14 @@ class Information(Cog):
 
         if member_names:
             embed.add_field(
-                name=self.bot.get_text("information.roleinfo.FIELDS.MEMBERS.NAME", count=len(role.members)),
-                value=(", ".join(member_names) if len(member_names) > 1 else member_names[0]),
+                name=await self.bot.get_text("information.roleinfo.FIELDS.MEMBERS.NAME", ctx, count=len(role.members)),
+                value=", ".join(member_names) if len(member_names) > 1 else member_names[0],
                 inline=False
             )
         else:
             embed.add_field(
-                name=self.bot.get_text("information.roleinfo.FIELDS.MEMBERS.NAME", count=0),
-                value=self.bot.get_text("information.roleinfo.FIELDS.MEMBERS.NONE"),
+                name=await self.bot.get_text("information.roleinfo.FIELDS.MEMBERS.NAME", ctx, count=0),
+                value=await self.bot.get_text("information.roleinfo.FIELDS.MEMBERS.NONE", ctx),
                 inline=False
             )
 
@@ -1473,7 +1482,7 @@ class Information(Cog):
 
         if granted_permissions:
             embed.set_footer(
-                text=self.bot.get_text("information.roleinfo.FOOTER.DANGEROUS"),
+                text=await self.bot.get_text("information.roleinfo.FOOTER.DANGEROUS", ctx),
                 icon_url="https://cdn.discordapp.com/emojis/1308023743565529138.webp?size=64",
             )
 
@@ -1485,11 +1494,11 @@ class Information(Cog):
         Get a bots invite by providing the bots ID.
         """
         if not user.bot:
-            return await ctx.warn(self.bot.get_text("information.getbotinvite.NOT_BOT"))
+            return await ctx.warn(await self.bot.get_text("information.getbotinvite.NOT_BOT", ctx))
 
         button = Button(
             style=ButtonStyle.link,
-            label=self.bot.get_text("information.getbotinvite.BUTTON", name=user.name),
+            label=await self.bot.get_text("information.getbotinvite.BUTTON", ctx, name=user.name),
             url=f"https://discord.com/api/oauth2/authorize?client_id={user.id}&permissions=8&scope=bot%20applications.commands",
         )
 
@@ -1517,12 +1526,12 @@ class Information(Cog):
         )
         
         if not names:
-            return await ctx.warn(self.bot.get_text("information.gnames.NO_HISTORY", guild=guild))
+            return await ctx.warn(await self.bot.get_text("information.gnames.NO_HISTORY", ctx, guild=guild))
 
         paginator = Paginator(
             ctx,
             entries=[f"**{record['name']}** ({format_dt(record['changed_at'], 'R')})" for record in names],
-            embed=Embed(title=self.bot.get_text("information.gnames.TITLE", guild_name=guild.name)),
+            embed=Embed(title=await self.bot.get_text("information.gnames.TITLE", ctx, guild_name=guild.name)),
         )
         
         return await paginator.start()
@@ -1530,17 +1539,8 @@ class Information(Cog):
     @command()
     @has_permissions(manage_guild=True)
     async def cleargnames(self, ctx: Context):
-        """
-        Clear the guild name history.
-        """
-        await self.bot.db.execute(
-            """
-            DELETE FROM gnames 
-            WHERE guild_id = $1
-            """, 
-            ctx.guild.id
-        )
-        await ctx.approve(self.bot.get_text("information.cleargnames.SUCCESS"))
+        await self.bot.db.execute("DELETE FROM gnames WHERE guild_id = $1", ctx.guild.id)
+        await ctx.approve(await self.bot.get_text("information.cleargnames.SUCCESS", ctx))
 
     @hybrid_command(name="weather", with_app_command=True, brief="Get the current weather for a city/country", fallback="view")
     @discord.app_commands.allowed_installs(guilds=True, users=True)
@@ -1557,9 +1557,9 @@ class Information(Cog):
                 async with session.get(url) as response:
                     if response.status != 200:
                         return await ctx.warn(
-                            self.bot.get_text("information.weather.ERROR.NOT_FOUND", location=location)
+                            await self.bot.get_text("information.weather.ERROR.NOT_FOUND", ctx, location=location)
                         )
-                        
+                    
                     data = await response.json()
                     current = data['current_condition'][0]
                     
@@ -1584,8 +1584,9 @@ class Information(Cog):
                     weather_emoji = weather_emojis.get(weather_desc, '🌡️')
 
                     embed = discord.Embed(
-                        title=self.bot.get_text(
+                        title=await self.bot.get_text(
                             "information.weather.EMBED.TITLE",
+                            ctx,
                             location=data['nearest_area'][0]['areaName'][0]['value']
                         ),
                         description=f"{weather_emoji} {weather_desc}",
@@ -1593,15 +1594,11 @@ class Information(Cog):
                         timestamp=datetime.utcnow()
                     )
                     
-                    temp_c = current['temp_C']
-                    temp_f = current['temp_F']
-                    feels_like_c = current['FeelsLikeC']
-                    feels_like_f = current['FeelsLikeF']
-                    
                     embed.add_field(
-                        name=self.bot.get_text("information.weather.EMBED.FIELDS.TEMPERATURE.NAME"),
-                        value=self.bot.get_text(
+                        name=await self.bot.get_text("information.weather.EMBED.FIELDS.TEMPERATURE.NAME", ctx),
+                        value=await self.bot.get_text(
                             "information.weather.EMBED.FIELDS.TEMPERATURE.VALUE",
+                            ctx,
                             temp_c=current['temp_C'],
                             temp_f=current['temp_F'],
                             feels_c=current['FeelsLikeC'],
@@ -1611,18 +1608,20 @@ class Information(Cog):
                     )
                     
                     embed.add_field(
-                        name=self.bot.get_text("information.weather.EMBED.FIELDS.HUMIDITY.NAME"),
-                        value=self.bot.get_text(
+                        name=await self.bot.get_text("information.weather.EMBED.FIELDS.HUMIDITY.NAME", ctx),
+                        value=await self.bot.get_text(
                             "information.weather.EMBED.FIELDS.HUMIDITY.VALUE",
+                            ctx,
                             humidity=current['humidity']
                         ),
                         inline=True
                     )
                     
                     embed.add_field(
-                        name=self.bot.get_text("information.weather.EMBED.FIELDS.WIND.NAME"),
-                        value=self.bot.get_text(
+                        name=await self.bot.get_text("information.weather.EMBED.FIELDS.WIND.NAME", ctx),
+                        value=await self.bot.get_text(
                             "information.weather.EMBED.FIELDS.WIND.VALUE",
+                            ctx,
                             speed=current['windspeedKmph']
                         ),
                         inline=True
@@ -1630,9 +1629,10 @@ class Information(Cog):
                     
                     if 'cloudcover' in current:
                         embed.add_field(
-                            name=self.bot.get_text("information.weather.EMBED.FIELDS.CLOUD_COVER.NAME"),
-                            value=self.bot.get_text(
+                            name=await self.bot.get_text("information.weather.EMBED.FIELDS.CLOUD_COVER.NAME", ctx),
+                            value=await self.bot.get_text(
                                 "information.weather.EMBED.FIELDS.CLOUD_COVER.VALUE",
+                                ctx,
                                 cover=current['cloudcover']
                             ),
                             inline=True
@@ -1640,9 +1640,10 @@ class Information(Cog):
                     
                     if 'visibility' in current:
                         embed.add_field(
-                            name=self.bot.get_text("information.weather.EMBED.FIELDS.VISIBILITY.NAME"),
-                            value=self.bot.get_text(
+                            name=await self.bot.get_text("information.weather.EMBED.FIELDS.VISIBILITY.NAME", ctx),
+                            value=await self.bot.get_text(
                                 "information.weather.EMBED.FIELDS.VISIBILITY.VALUE",
+                                ctx,
                                 distance=current['visibility']
                             ),
                             inline=True
@@ -1650,9 +1651,10 @@ class Information(Cog):
                     
                     if 'precipMM' in current:
                         embed.add_field(
-                            name=self.bot.get_text("information.weather.EMBED.FIELDS.PRECIPITATION.NAME"),
-                            value=self.bot.get_text(
+                            name=await self.bot.get_text("information.weather.EMBED.FIELDS.PRECIPITATION.NAME", ctx),
+                            value=await self.bot.get_text(
                                 "information.weather.EMBED.FIELDS.PRECIPITATION.VALUE",
+                                ctx,
                                 amount=current['precipMM']
                             ),
                             inline=True
@@ -1664,7 +1666,7 @@ class Information(Cog):
                     
             except Exception as e:
                 await ctx.warn(
-                    self.bot.get_text("information.weather.ERROR.GENERIC", error=str(e))
+                    await self.bot.get_text("information.weather.ERROR.GENERIC", ctx, error=str(e))
                 )
 
     @hybrid_group(name="poll", invoke_without_command=True)
@@ -1853,8 +1855,9 @@ class Information(Cog):
             
             if not polls:
                 return await ctx.warn(
-                    self.bot.get_text(
+                    await self.bot.get_text(
                         "information.poll.list.NO_POLLS.FILTERED" if creator else "information.poll.list.NO_POLLS.DEFAULT",
+                        ctx,
                         creator=creator.mention if creator else None
                     )
                 )
@@ -1867,23 +1870,23 @@ class Information(Cog):
                 )
                 
                 entry = (
-                    self.bot.get_text("information.poll.list.ENTRY.TITLE", title=poll['title']) + "\n" +
-                    self.bot.get_text("information.poll.list.ENTRY.CREATOR", 
+                    await self.bot.get_text("information.poll.list.ENTRY.TITLE", ctx, title=poll['title']) + "\n" +
+                    await self.bot.get_text("information.poll.list.ENTRY.CREATOR", ctx,
                         creator=ctx.guild.get_member(poll['creator_id']).mention) + "\n" +
-                    self.bot.get_text("information.poll.list.ENTRY.VOTES", count=vote_count) + "\n" +
-                    self.bot.get_text("information.poll.list.ENTRY.ID", id=poll['poll_id']) + "\n" +
-                    self.bot.get_text("information.poll.list.ENTRY.CREATED", 
+                    await self.bot.get_text("information.poll.list.ENTRY.VOTES", ctx, count=vote_count) + "\n" +
+                    await self.bot.get_text("information.poll.list.ENTRY.ID", ctx, id=poll['poll_id']) + "\n" +
+                    await self.bot.get_text("information.poll.list.ENTRY.CREATED", ctx,
                         time=format_dt(poll['created_at'], 'R'))
                 )
                 if poll['ends_at']:
-                    entry += "\n" + self.bot.get_text("information.poll.list.ENTRY.ENDS",
+                    entry += "\n" + await self.bot.get_text("information.poll.list.ENTRY.ENDS", ctx,
                         time=format_dt(poll['ends_at'], 'R'))
                 entries.append(entry)
 
             paginator = Paginator(
                 ctx,
                 entries=entries,
-                embed=Embed(title=self.bot.get_text("information.poll.list.EMBED_TITLE", guild=ctx.guild)),
+                embed=Embed(title=await self.bot.get_text("information.poll.list.EMBED_TITLE", ctx, guild=ctx.guild)),
             )
             return await paginator.start()
 
@@ -1896,24 +1899,23 @@ class Information(Cog):
             try:
                 poll_id = UUID(poll_id)
             except ValueError:
-                return await ctx.warn(self.bot.get_text("information.poll.end.INVALID_ID"))
+                return await ctx.warn(await self.bot.get_text("information.poll.end.INVALID_ID", ctx))
 
-            poll = await self.bot.db.fetchrow("""
-                SELECT * FROM polls WHERE poll_id = $1 AND guild_id = $2 AND is_active = true
-            """, poll_id, ctx.guild.id)
+            poll = await self.bot.db.fetchrow(
+                "SELECT * FROM polls WHERE poll_id = $1 AND guild_id = $2 AND is_active = true",
+                poll_id, ctx.guild.id
+            )
             
             if not poll:
-                return await ctx.warn(self.bot.get_text("information.poll.end.NOT_FOUND"))
+                return await ctx.warn(await self.bot.get_text("information.poll.end.NOT_FOUND", ctx))
             
-            if not (
-                ctx.author.id == poll['creator_id'] 
-                or ctx.author.guild_permissions.manage_guild
-            ):
-                return await ctx.warn(self.bot.get_text("information.poll.end.NO_PERMISSION"))
+            if not (ctx.author.id == poll['creator_id'] or ctx.author.guild_permissions.manage_guild):
+                return await ctx.warn(await self.bot.get_text("information.poll.end.NO_PERMISSION", ctx))
             
-            await self.bot.db.execute("""
-                UPDATE polls SET is_active = false WHERE poll_id = $1
-            """, poll_id)
+            await self.bot.db.execute(
+                "UPDATE polls SET is_active = false WHERE poll_id = $1",
+                poll_id
+            )
             
             try:
                 channel = ctx.guild.get_channel(poll['channel_id'])
@@ -1923,7 +1925,7 @@ class Information(Cog):
             except:
                 pass
             
-            return await ctx.approve(self.bot.get_text("information.poll.end.SUCCESS"))
+            return await ctx.approve(await self.bot.get_text("information.poll.end.SUCCESS", ctx))
 
     @poll.command(name="results")
     async def poll_results(self, ctx: Context, poll_id: str) -> Message:
@@ -1934,13 +1936,13 @@ class Information(Cog):
             try:
                 poll_id = UUID(poll_id)
             except ValueError:
-                return await ctx.warn(self.bot.get_text("information.poll.results.INVALID_ID"))
+                return await ctx.warn(await self.bot.get_text("information.poll.results.INVALID_ID", ctx))
 
             results_view = PollResultsView(poll_id)
             results_embed = await results_view.generate_results(ctx)
             
             if not results_embed:
-                return await ctx.warn(self.bot.get_text("information.poll.results.NOT_FOUND"))
+                return await ctx.warn(await self.bot.get_text("information.poll.results.NOT_FOUND", ctx))
             
             return await ctx.send(embed=results_embed, view=results_view)
 
@@ -1956,6 +1958,80 @@ class Information(Cog):
                 shard_id=ctx.guild.shard_id
             )
         )
+
+    @hybrid_command(name="language", aliases=["lang"])
+    async def language(self, ctx: Context) -> Message:
+        """Change your preferred language for bot interactions."""
+        available_languages = []
+        
+        system_dir = Path("langs/system")
+        if system_dir.exists():
+            for lang_file in system_dir.glob("*/*.json"):
+                try:
+                    with lang_file.open(encoding='utf-8') as f:
+                        data = json.load(f)
+                        if all(key in data for key in ['language', 'language_code', 'language_local']):
+                            available_languages.append({
+                                'name': data['language'],
+                                'code': data['language_code'],
+                                'local': data['language_local']
+                            })
+                except Exception as e:
+                    continue
+
+        available_languages = {lang['code']: lang for lang in available_languages}.values()
+        
+        select = Select(
+            placeholder="Choose a language...",
+            options=[
+                SelectOption(
+                    label=lang['name'],
+                    value=lang['local'],
+                    description=f"Set language to {lang['name']}"
+                )
+                for lang in available_languages
+            ]
+        )
+
+        async def select_callback(interaction: Interaction):
+            if interaction.user.id != ctx.author.id:
+                await interaction.warn(self.bot.get_text("system.help.CANNOT_INTERACT"))
+                return
+
+            selected_lang = interaction.data["values"][0]
+            
+            await self.bot.db.execute(
+                """
+                INSERT INTO user_settings (user_id, language)
+                VALUES ($1, $2)
+                ON CONFLICT (user_id) 
+                DO UPDATE SET language = $2
+                """,
+                ctx.author.id,
+                selected_lang
+            )
+
+            embed = Embed(
+                description=f"✅ Your language has been set to `{selected_lang}`",
+                color=config.COLORS.APPROVE
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+        select.callback = select_callback
+        view = View(timeout=180)
+        view.add_item(select)
+
+        current_lang = await self.bot.db.fetchval(
+            "SELECT language FROM user_settings WHERE user_id = $1",
+            ctx.author.id
+        ) or "en-US"
+
+        embed = Embed(
+            description=f"Select your preferred language from the dropdown menu below.\nCurrent language: `{current_lang}`",
+            color=config.COLORS.APPROVE
+        )
+        
+        return await ctx.send(embed=embed, view=view)
     
 class PollVoteSelect(Select):
     def __init__(self, poll_id: UUID, choices: list[str], multiple: bool = False):

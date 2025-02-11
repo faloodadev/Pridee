@@ -39,10 +39,9 @@ class EvictHelp(MinimalHelpCommand):
         if not self.bot_user:
             self.bot_user = self.context.bot.user
 
-    def create_main_help_embed(self, ctx):
-
+    async def create_main_help_embed(self, ctx):
         embed = Embed(
-            description=ctx.bot.get_text("system.help.INFORMATION_DESC"),
+            description=await ctx.bot.get_text("system.help.INFORMATION_DESC", ctx),
         )
 
         embed.add_field(
@@ -58,7 +57,7 @@ class EvictHelp(MinimalHelpCommand):
             icon_url=ctx.bot.user.display_avatar.url,
             url=config.CLIENT.SUPPORT_URL,
         )
-        embed.set_footer(text=ctx.bot.get_text("system.help.SELECT_CATEGORY"))
+        embed.set_footer(text=await ctx.bot.get_text("system.help.SELECT_CATEGORY", ctx))
 
         return embed
 
@@ -91,7 +90,7 @@ class EvictHelp(MinimalHelpCommand):
         await self.initialize_bot_user()
         bot = self.context.bot
 
-        embed = self.create_main_help_embed(self.context)
+        embed = await self.create_main_help_embed(self.context)
         embed.set_thumbnail(url=bot.user.display_avatar.url)
 
         categories = sorted(
@@ -117,7 +116,7 @@ class EvictHelp(MinimalHelpCommand):
             return
 
         select = Select(
-            placeholder=self.context.bot.get_text("system.help.DROPDOWN_PLACEHOLDER"),
+            placeholder=await self.context.bot.get_text("system.help.DROPDOWN_PLACEHOLDER", self.context),
             options=[
                 SelectOption(
                     label=category[0], value=category[0], description=category[1]
@@ -128,7 +127,7 @@ class EvictHelp(MinimalHelpCommand):
 
         async def select_callback(interaction: Interaction):
             if interaction.user.id != self.context.author.id:
-                await interaction.warn(self.context.bot.get_text("system.help.CANNOT_INTERACT"))
+                await interaction.warn(await self.context.bot.get_text("system.help.CANNOT_INTERACT", self.context))
                 return
 
             selected_category = interaction.data["values"][0]  # type: ignore
@@ -155,7 +154,7 @@ class EvictHelp(MinimalHelpCommand):
             )
 
             embed = Embed(
-                title=self.context.bot.get_text("system.help.CATEGORY.TITLE", category_name=selected_category),
+                title=await self.context.bot.get_text("system.help.CATEGORY.TITLE", self.context, category_name=selected_category),
                 description=f"```\n{command_list}\n```",
             )
 
@@ -164,7 +163,7 @@ class EvictHelp(MinimalHelpCommand):
             )
 
             embed.set_footer(
-                text=self.context.bot.get_text("system.help.CATEGORY.FOOTER", 
+                text=await self.context.bot.get_text("system.help.CATEGORY.FOOTER", self.context,
                     count=len(commands),
                     plural="s" if len(commands) != 1 else ""
                 )
@@ -208,7 +207,7 @@ class EvictHelp(MinimalHelpCommand):
                 permissions = brief
 
             embed = Embed(
-                title=self.context.bot.get_text("system.help.COMMAND.title.GROUP",
+                title=await self.context.bot.get_text("system.help.COMMAND.title.GROUP", self.context,
                     command_name=group.qualified_name,
                     module_name=group.cog_name
                 ),
@@ -275,7 +274,7 @@ class EvictHelp(MinimalHelpCommand):
 
             for param in command.clean_params.values():
                 if isinstance(param.annotation, FlagsMeta):
-                    self._add_flag_formatting(param.annotation, embed)
+                    await self._add_flag_formatting(param.annotation, embed)
 
             embed.set_footer(
                 text=f"Aliases: {', '.join(a for a in command.aliases) if len(command.aliases) > 0 else 'none'} ",
@@ -326,7 +325,7 @@ class EvictHelp(MinimalHelpCommand):
             permissions = brief
 
         embed = Embed(
-            title=self.context.bot.get_text("system.help.COMMAND.title.NORMAL", 
+            title=await self.context.bot.get_text("system.help.COMMAND.title.NORMAL", self.context,
                 command_name=command.qualified_name,
                 module_name=command.cog_name),
             description=f"> {command.description.capitalize() if command.description else (command.help.capitalize() if command.help else None)}",
@@ -334,7 +333,7 @@ class EvictHelp(MinimalHelpCommand):
 
         embed.add_field(
             name="",
-            value=self.context.bot.get_text("system.help.COMMAND.SYNTAX",
+            value=await self.context.bot.get_text("system.help.COMMAND.SYNTAX", self.context,
                 syntax=syntax,
                 prefix=self.context.clean_prefix,
                 command_name=command.qualified_name,
@@ -344,17 +343,17 @@ class EvictHelp(MinimalHelpCommand):
         )
 
         embed.add_field(
-            name=self.context.bot.get_text("system.help.COMMAND.PERMISSIONS"),
+            name=await self.context.bot.get_text("system.help.COMMAND.PERMISSIONS", self.context),
             value=f"{permissions}",
             inline=True,
         )
 
         for param in command.clean_params.values():
             if isinstance(param.annotation, FlagsMeta):
-                self._add_flag_formatting(param.annotation, embed)
+                await self._add_flag_formatting(param.annotation, embed)
 
         embed.set_footer(
-            text=self.context.bot.get_text("system.help.COMMAND.ALIASES", 
+            text=await self.context.bot.get_text("system.help.COMMAND.ALIASES", self.context,
                 aliases=', '.join(a for a in command.aliases) if len(command.aliases) > 0 else 'none'
             ),
             icon_url=self.context.author.display_avatar.url,
@@ -383,7 +382,7 @@ class EvictHelp(MinimalHelpCommand):
         if not string:
             return
 
-        error_message = self.context.bot.get_text("system.help.ERRORS.COMMAND_NOT_FOUND",
+        error_message = await self.context.bot.get_text("system.help.ERRORS.COMMAND_NOT_FOUND", self.context,
             emoji=config.EMOJIS.CONTEXT.WARN,
             user=self.context.author.mention,
             command=string
@@ -396,7 +395,7 @@ class EvictHelp(MinimalHelpCommand):
         if not command or not subcommand:
             return
 
-        error_message = self.context.bot.get_text("system.help.ERRORS.SUBCOMMAND_NOT_FOUND",
+        error_message = await self.context.bot.get_text("system.help.ERRORS.SUBCOMMAND_NOT_FOUND", self.context,
             emoji=config.EMOJIS.CONTEXT.WARN,
             user=self.context.author.mention,
             command=command,
@@ -406,8 +405,7 @@ class EvictHelp(MinimalHelpCommand):
         embed = Embed(description=error_message, color=config.COLORS.WARN)
         await self.context.send(embed=embed)
 
-    def _add_flag_formatting(self, annotation: FlagConverter, embed: Embed):
-
+    async def _add_flag_formatting(self, annotation: FlagConverter, embed: Embed):
         optional: List[str] = [
             f"`--{name}{' on/off' if isinstance(flag.annotation, Status) else ''}`: {flag.description}"
             for name, flag in annotation.get_flags().items()
@@ -422,14 +420,14 @@ class EvictHelp(MinimalHelpCommand):
 
         if required:
             embed.add_field(
-                name=self.context.bot.get_text("system.help.COMMAND.FLAGS.REQUIRED"), 
+                name=await self.context.bot.get_text("system.help.COMMAND.FLAGS.REQUIRED", self.context), 
                 value="\n".join(required), 
                 inline=True
             )
 
         if optional:
             embed.add_field(
-                name=self.context.bot.get_text("system.help.COMMAND.FLAGS.OPTIONAL"), 
+                name=await self.context.bot.get_text("system.help.COMMAND.FLAGS.OPTIONAL", self.context), 
                 value="\n".join(optional), 
                 inline=True
             )

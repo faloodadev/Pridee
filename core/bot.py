@@ -554,200 +554,203 @@ class Evict(commands.AutoShardedBot, commands.Cog):
         self.traceback[key] = exc
             
         return await ctx.warn(
-            self.get_text("system.errors.COMMAND.EXCEPTION", 
+            await self.get_text("system.errors.COMMAND.EXCEPTION", ctx,
                 command=ctx.command.qualified_name),
             content=f"`{key}`",
         )
 
     async def on_command_error(self, ctx: Context, exc: CommandError) -> Any:
         """Handle command errors with detailed error tracking."""
-        span.set_attribute("command", ctx.command.qualified_name if ctx.command else "unknown")
-        span.set_attribute("error_type", exc.__class__.__name__)
-        
-        if not ctx.channel:
-            return
-                
-        if not ctx.guild:
-            can_send = True
-        else:
-            can_send = (
-                ctx.channel.permissions_for(ctx.guild.me).send_messages
-                and ctx.channel.permissions_for(ctx.guild.me).embed_links
-            )
-
-        if not can_send:
-            return
-
-        if isinstance(exc, (CommandNotFound, DisabledCommand, NotOwner)):
-            return
-
-        elif isinstance(exc, (MissingRequiredArgument, MissingRequiredAttachment, BadLiteralArgument)):
-            return await ctx.send_help(ctx.command)
-
-        elif isinstance(exc, FlagError):
-            if isinstance(exc, TooManyFlags):
-                return await ctx.warn(
-                    self.get_text("system.errors.COMMAND.FLAG.DUPLICATE",
-                        flag_name=exc.flag.name)
-                )
-
-            elif isinstance(exc, BadFlagArgument):
-                try:
-                    annotation = exc.flag.annotation.__name__
-                except AttributeError:
-                    annotation = exc.flag.annotation.__class__.__name__
-
-                msg = self.get_text("system.errors.COMMAND.FLAG.CAST_ERROR",
-                    flag_name=exc.flag.name,
-                    annotation=annotation)
-                
-                if annotation == "Status":
-                    msg = [msg, self.get_text("system.errors.COMMAND.FLAG.STATUS_HINT")]
+        with self.tracer.start_span("command_error") as span:
+            span.set_attribute("command", ctx.command.qualified_name if ctx.command else "unknown")
+            span.set_attribute("error_type", exc.__class__.__name__)
+            
+            if not ctx.channel:
+                return
                     
-                return await ctx.warn(*msg)
-
-            elif isinstance(exc, MissingRequiredFlag):
-                return await ctx.warn(
-                    self.bot.get_text("system.errors.COMMAND.FLAG.MISSING_REQUIRED",
-                        flag_name=exc.flag.name)
+            if not ctx.guild:
+                can_send = True
+            else:
+                can_send = (
+                    ctx.channel.permissions_for(ctx.guild.me).send_messages
+                    and ctx.channel.permissions_for(ctx.guild.me).embed_links
                 )
 
-            elif isinstance(exc, MissingFlagArgument):
-                return await ctx.warn(
-                    self.get_text("system.errors.COMMAND.FLAG.MISSING_VALUE",
-                        flag_name=exc.flag.name)
-                )
-
-        elif isinstance(exc, CommandInvokeError):
-            return await ctx.warn(exc.original)
-
-        elif isinstance(exc, MaxConcurrencyReached):
-            if ctx.command.qualified_name in ("lastfm set", "lastfm index"):
+            if not can_send:
                 return
 
-            return await ctx.warn(
-                self.get_text("system.errors.CONCURRENCY.MAX_CONCURRENT",
-                    number=plural(exc.number),
-                    time="time",
-                    per=exc.per.name),
-                delete_after=5,
-            )
+            if isinstance(exc, MissingRequiredArgument):
+                return await ctx.send_help(ctx.command)
 
-        elif isinstance(exc, BadUnionArgument):
-            if exc.converters == (Member, User):
+            if isinstance(exc, (CommandNotFound, DisabledCommand, NotOwner)):
+                return
+
+            elif isinstance(exc, (
+                MissingRequiredAttachment,
+                BadLiteralArgument,
+                BadUnionArgument,
+                BadArgument
+            )):
+                return await ctx.send_help(ctx.command)
+
+            elif isinstance(exc, TagScriptError):
+                if isinstance(exc, EmbedParseError):
+                    return await ctx.warn(
+                        await self.get_text("system.errors.SCRIPT.PARSE_ERROR", ctx),
+                        *exc.args
+                    )
+
+            elif isinstance(exc, CommandOnCooldown):
+                if exc.retry_after > 30:
+                    return await ctx.warn(
+                        await self.get_text("system.errors.COOLDOWN.MESSAGE", ctx),
+                        await self.get_text("system.errors.COOLDOWN.RETRY", ctx, 
+                            time=format_timespan(exc.retry_after))
+                    )
+                return await ctx.message.add_reaction("⏰")
+
+            elif isinstance(exc, FlagError):
+                if isinstance(exc, TooManyFlags):
+                    return await ctx.warn(
+                        await self.get_text("system.errors.COMMAND.FLAG.DUPLICATE", ctx,
+                            flag_name=exc.flag.name)
+                    )
+
+                elif isinstance(exc, BadFlagArgument):
+                    try:
+                        annotation = exc.flag.annotation.__name__
+                    except AttributeError:
+                        annotation = exc.flag.annotation.__class__.__name__
+
+                    msg = await self.get_text("system.errors.COMMAND.FLAG.CAST_ERROR", ctx,
+                        flag_name=exc.flag.name,
+                        annotation=annotation)
+                    
+                    if annotation == "Status":
+                        msg = [msg, await self.get_text("system.errors.COMMAND.FLAG.STATUS_HINT", ctx)]
+                        
+                    return await ctx.warn(*msg)
+
+                elif isinstance(exc, MissingRequiredFlag):
+                    return await ctx.warn(
+                        await self.get_text("system.errors.COMMAND.FLAG.MISSING_REQUIRED", ctx,
+                            flag_name=exc.flag.name)
+                    )
+
+                elif isinstance(exc, MissingFlagArgument):
+                    return await ctx.warn(
+                        await self.get_text("system.errors.COMMAND.FLAG.MISSING_VALUE", ctx,
+                            flag_name=exc.flag.name)
+                    )
+
+            elif isinstance(exc, CommandInvokeError):
+                return await ctx.warn(exc.original)
+
+            elif isinstance(exc, MaxConcurrencyReached):
+                if ctx.command.qualified_name in ("lastfm set", "lastfm index"):
+                    return
+
                 return await ctx.warn(
-                    self.get_text("system.errors.SEARCH.MEMBER_USER",
-                        param=exc.param.name,
-                        argument=ctx.current_argument),
-                    self.get_text("system.errors.SEARCH.USER_ID_HINT")
+                    await self.get_text("system.errors.CONCURRENCY.MAX_CONCURRENT", ctx,
+                        number=plural(exc.number),
+                        time="time",
+                        per=exc.per.name),
+                    delete_after=5,
                 )
 
-            elif exc.converters == (Guild, Invite):
+            elif isinstance(exc, (MemberNotFound, UserNotFound, RoleNotFound, 
+                               ChannelNotFound, BadInviteArgument, MessageNotFound)):
+                error_types = {
+                    MemberNotFound: "MEMBER",
+                    UserNotFound: "USER",
+                    RoleNotFound: "ROLE",
+                    ChannelNotFound: "CHANNEL",
+                    BadInviteArgument: "INVITE",
+                    MessageNotFound: "MESSAGE"
+                }
                 return await ctx.warn(
-                    self.get_text("system.errors.SEARCH.SERVER",
-                        argument=ctx.current_argument)
+                    await self.get_text(f"system.errors.SEARCH.NOT_FOUND.{error_types[type(exc)]}", ctx,
+                        argument=getattr(exc, 'argument', ''))
                 )
+
+            elif isinstance(exc, RangeError):
+                label = ""
+                if exc.minimum is None and exc.maximum is not None:
+                    label = f"no more than `{exc.maximum}`"
+                elif exc.minimum is not None and exc.maximum is None:
+                    label = f"no less than `{exc.minimum}`"
+                elif exc.maximum is not None and exc.minimum is not None:
+                    label = f"between `{exc.minimum}` and `{exc.maximum}`"
+
+                translation_key = "RANGE_CHARS" if label and isinstance(exc.value, str) else "RANGE"
+                return await ctx.warn(
+                    await self.get_text(f"system.errors.VALIDATION.{translation_key}", ctx,
+                        label=label)
+                )
+
+            elif isinstance(exc, MissingPermissions):
+                permissions = human_join(
+                    [f"`{permission}`" for permission in exc.missing_permissions],
+                    final="and"
+                )
+                return await ctx.warn(
+                    await self.get_text("system.errors.PERMISSIONS.USER_MISSING", ctx,
+                        permissions=permissions,
+                        plural="s" if len(exc.missing_permissions) > 1 else "")
+                )
+            
+            elif isinstance(exc, NSFWChannelRequired):
+                return await ctx.warn(
+                    await self.get_text("system.errors.PERMISSIONS.NSFW_REQUIRED", ctx)
+                )
+
+            elif isinstance(exc, CommandError):
+                if isinstance(exc, (HTTPException, NotFound)) and not isinstance(exc, (CheckFailure, Forbidden)):
+                    if "Unknown Channel" in exc.text:
+                        return
+                    return await ctx.warn(exc.text.capitalize())
+                
+                if isinstance(exc, (Forbidden, CommandInvokeError)):
+                    error = exc.original if isinstance(exc, CommandInvokeError) else exc
+                    
+                    if isinstance(error, Forbidden):
+                        perms = ctx.guild.me.guild_permissions
+                        missing_perms = []
+                        
+                        if not perms.manage_channels:
+                            missing_perms.append('`manage_channels`')
+                        if not perms.manage_roles:
+                            missing_perms.append('`manage_roles`')
+                            
+                        if missing_perms:
+                            error_msg = await self.get_text("system.errors.PERMISSIONS.BOT_MISSING", ctx,
+                                permissions=', '.join(missing_perms))
+                        else:
+                            error_msg = await self.get_text("system.errors.PERMISSIONS.BOT_MISSING_GENERIC", ctx)
+                        
+                        return await ctx.warn(
+                            error_msg,
+                            f"Error: {str(error)}"
+                        )
+                        
+                    return await ctx.warn(str(error))
+
+                origin = getattr(exc, "original", exc)
+                with suppress(TypeError):
+                    if any(
+                        forbidden in origin.args[-1]
+                        for forbidden in (
+                            "global check",
+                            "check functions",
+                            "Unknown Channel",
+                        )
+                    ):
+                        return
+
+                return await ctx.warn(*origin.args)
 
             else:
-                return await ctx.warn(
-                    self.get_text("system.errors.SEARCH.CASTING",
-                        param=exc.param.name,
-                        converters=human_join([f'`{c.__name__}`' for c in exc.converters]))
-                )
-
-        elif isinstance(exc, (MemberNotFound, UserNotFound, RoleNotFound, 
-                           ChannelNotFound, BadInviteArgument, MessageNotFound)):
-            error_types = {
-                MemberNotFound: "MEMBER",
-                UserNotFound: "USER",
-                RoleNotFound: "ROLE",
-                ChannelNotFound: "CHANNEL",
-                BadInviteArgument: "INVITE",
-                MessageNotFound: "MESSAGE"
-            }
-            return await ctx.warn(
-                self.get_text(f"system.errors.SEARCH.NOT_FOUND.{error_types[type(exc)]}",
-                    argument=getattr(exc, 'argument', ''))
-            )
-
-        elif isinstance(exc, RangeError):
-            label = ""
-            if exc.minimum is None and exc.maximum is not None:
-                label = f"no more than `{exc.maximum}`"
-            elif exc.minimum is not None and exc.maximum is None:
-                label = f"no less than `{exc.minimum}`"
-            elif exc.maximum is not None and exc.minimum is not None:
-                label = f"between `{exc.minimum}` and `{exc.maximum}`"
-
-            translation_key = "RANGE_CHARS" if label and isinstance(exc.value, str) else "RANGE"
-            return await ctx.warn(
-                self.get_text(f"system.errors.VALIDATION.{translation_key}",
-                    label=label)
-            )
-
-        elif isinstance(exc, MissingPermissions):
-            permissions = human_join(
-                [f"`{permission}`" for permission in exc.missing_permissions],
-                final="and"
-            )
-            return await ctx.warn(
-                self.get_text("system.errors.PERMISSIONS.USER_MISSING",
-                    permissions=permissions,
-                    plural="s" if len(exc.missing_permissions) > 1 else "")
-            )
-        
-        elif isinstance(exc, NSFWChannelRequired):
-            return await ctx.warn(
-                self.get_text("system.errors.PERMISSIONS.NSFW_REQUIRED")
-            )
-
-        elif isinstance(exc, CommandError):
-            if isinstance(exc, (HTTPException, NotFound)) and not isinstance(exc, (CheckFailure, Forbidden)):
-                if "Unknown Channel" in exc.text:
-                    return
-                return await ctx.warn(exc.text.capitalize())
-            
-            if isinstance(exc, (Forbidden, CommandInvokeError)):
-                error = exc.original if isinstance(exc, CommandInvokeError) else exc
-                
-                if isinstance(error, Forbidden):
-                    perms = ctx.guild.me.guild_permissions
-                    missing_perms = []
-                    
-                    if not perms.manage_channels:
-                        missing_perms.append('`manage_channels`')
-                    if not perms.manage_roles:
-                        missing_perms.append('`manage_roles`')
-                        
-                    if missing_perms:
-                        error_msg = self.get_text("system.errors.PERMISSIONS.BOT_MISSING",
-                            permissions=', '.join(missing_perms))
-                    else:
-                        error_msg = self.get_text("system.errors.PERMISSIONS.BOT_MISSING_GENERIC")
-                    
-                    return await ctx.warn(
-                        error_msg,
-                        f"Error: {str(error)}"
-                    )
-                    
-                return await ctx.warn(str(error))
-
-            origin = getattr(exc, "original", exc)
-            with suppress(TypeError):
-                if any(
-                    forbidden in origin.args[-1]
-                    for forbidden in (
-                        "global check",
-                        "check functions",
-                        "Unknown Channel",
-                    )
-                ):
-                    return
-
-            return await ctx.warn(*origin.args)
-
-        else:
-            return await ctx.send_help(ctx.command)
+                return await ctx.send_help(ctx.command)
 
     async def get_context(
         self,
@@ -934,77 +937,108 @@ class Evict(commands.AutoShardedBot, commands.Cog):
     def _load_translations(self):
         """Load all translation files."""
         langs_dir = Path("langs")
+        self.translations = {}
+        
+        system_dir = langs_dir / "system"
+        if system_dir.exists():
+            for category_dir in system_dir.iterdir():
+                if not category_dir.is_dir():
+                    continue
+                    
+                category = category_dir.name
+                self.translations.setdefault('system', {})
+                self.translations['system'].setdefault(category, {})
+                
+                for lang_file in category_dir.glob("*.json"):
+                    try:
+                        lang_code = lang_file.stem 
+                        with lang_file.open(encoding='utf-8') as f:
+                            data = json.load(f)
+                            if 'system' in data and category in data['system']:
+                                self.translations.setdefault(lang_code, {})
+                                self.translations[lang_code].setdefault('system', {})
+                                self.translations[lang_code]['system'][category] = data['system'][category]
+                    except Exception as e:
+                        log.error(f"Error loading system translation file {lang_file}: {e}")
+
         for category_dir in langs_dir.iterdir():
-            if not category_dir.is_dir():
+            if not category_dir.is_dir() or category_dir.name == "system":
                 continue
                 
             category = category_dir.name
             self.translations[category] = {}
             
-            direct_file = category_dir / "ar-Latn.json"
-            if direct_file.is_file():
+            for lang_file in category_dir.glob("*.json"):
                 try:
-                    with direct_file.open(encoding='utf-8') as f:
-                        self.translations[category].update(json.load(f))
+                    lang_code = lang_file.stem  
+                    with lang_file.open(encoding='utf-8') as f:
+                        self.translations.setdefault(lang_code, {})
+                        self.translations[lang_code][category] = json.load(f)
                 except Exception as e:
-                    log.error(f"Error loading translation file {direct_file}: {e}")
-                
-            for json_file in category_dir.rglob("ar-Latn.json"):
-                if json_file == direct_file: 
-                    continue
-                
-                try:
-                    with json_file.open(encoding='utf-8') as f:
-                        rel_path = json_file.relative_to(category_dir).parent
-                        
-                        current = self.translations[category]
-                        for part in rel_path.parts:
-                            if part != "ar-Latn.json":
-                                current.setdefault(part, {})
-                                current = current[part]
-                            
-                        current.update(json.load(f))
-                except Exception as e:
-                    log.error(f"Error loading translation file {json_file}: {e}")
+                    log.error(f"Error loading command translation file {lang_file}: {e}")
                 
         log.info(f"Loaded translations for {len(self.translations)} categories")
 
-    def get_text(self, path: str, **kwargs) -> str:
+    async def get_text(self, path: str, ctx=None, **kwargs) -> str:
         """
         Get translated text with parameter substitution.
-        Path format: 'category.key.subkey.value'
+        Path format: 'category.key.subkey.value' or 'system.category.key.value'
         """
+        user_lang = 'en-US'  
+        if ctx and hasattr(ctx, 'author'):
+            try:
+                user_lang = await self.db.fetchval(
+                    "SELECT language FROM user_settings WHERE user_id = $1",
+                    ctx.author.id
+                ) or 'en-US'
+            except Exception as e:
+                log.error(f"Error fetching user language: {e}")
+
         try:
             parts = path.split('.')
-            current = self.translations['ar-Latn']
-            
-            for part in parts[:-1]: 
+            try:
+                current = self.translations[user_lang]
+                for part in parts[:-1]: 
+                    current = current[part]
+                
+                if parts[-1] in current:
+                    result = current[parts[-1]]
+                    if isinstance(result, str):
+                        return result.format(**kwargs) if kwargs else result
+                    elif isinstance(result, dict):
+                        if 'description' in result:
+                            return result['description'].format(**kwargs) if kwargs else result['description']
+            except (KeyError, AttributeError):
+                pass
+
+            try:
+                current = self.translations['en-US']
+                for part in parts[:-1]: 
+                    current = current[part]
+                
+                if parts[-1] in current:
+                    result = current[parts[-1]]
+                    if isinstance(result, str):
+                        return result.format(**kwargs) if kwargs else result
+                    elif isinstance(result, dict):
+                        if 'description' in result:
+                            return result['description'].format(**kwargs) if kwargs else result['description']
+            except (KeyError, AttributeError):
+                pass
+
+            current = self.translations
+            for part in parts:
                 current = current[part]
             
-            if parts[-1] in current:
-                result = current[parts[-1]]
-                if isinstance(result, str):
-                    return result.format(**kwargs) if kwargs else result
-                elif isinstance(result, dict):
-                    if 'description' in result:
-                        return result['description'].format(**kwargs) if kwargs else result['description']
+            if isinstance(current, str):
+                return current.format(**kwargs) if kwargs else current
+            elif isinstance(result, dict):
+                if 'description' in result:
+                    return result['description'].format(**kwargs) if kwargs else result['description']
                     
-            raise KeyError(f"No valid text found at path: {path}")
-            
         except (KeyError, AttributeError) as e:
-            try:
-                parts = path.split('.')
-                current = self.translations
-                for part in parts:
-                    current = current[part]
-                if isinstance(current, str):
-                    return current.format(**kwargs) if kwargs else current
-                elif isinstance(current, dict):
-                    if 'description' in current:
-                        return current['description'].format(**kwargs) if kwargs else current['description']
-            except (KeyError, AttributeError):
-                log.warning(f"Missing translation: {path}")
-                return f"Missing translation: {path}"
+            log.warning(f"Missing translation: {path}")
+            return f"Missing translation: {path}"
 
     async def process_image(self, buffer: bytes, effect_type: str, **kwargs) -> Any:
         """Process image effects using process pool."""

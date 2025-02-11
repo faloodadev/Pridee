@@ -51,8 +51,15 @@ class PerformanceMonitoring:
             
             trace.set_tracer_provider(trace_provider)
             
+            log.info(f"Initialized Jaeger exporter at {jaeger_exporter.collector_endpoint}")
+            
             self.tracer = trace.get_tracer(service_name)
             
+            with self.tracer.start_as_current_span("test_initialization") as span:
+                span.set_attribute("test", "true")
+                span.set_attribute("timestamp", time.time())
+                log.info("Created test span for Jaeger verification")
+
             reader = PrometheusMetricReader()
             meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
             metrics.set_meter_provider(meter_provider)
