@@ -1288,7 +1288,7 @@ class Moderation(Cog):
             ).inc(total_removed)
             
             return await ctx.approve(
-                f"Successfully removed {plural(total_removed, md='`'):reaction}"
+                await ctx.bot.get_text("moderation.purge.reactions.SUCCESS", ctx, count=total_removed)
             )
 
     async def do_mass_role(
@@ -1308,10 +1308,10 @@ class Moderation(Cog):
 
             try:
                 if not failure_message:
-                    failure_message = (
-                        f"Everyone you can manage already has {role.mention}!"
-                        if action == "add"
-                        else f"Nobody you can manage has {role.mention}!"
+                    failure_message = await ctx.bot.get_text(
+                        f"moderation.role.mass.{'ALREADY_HAS' if action == 'add' else 'NOBODY_HAS'}", 
+                        ctx,
+                        role=role.mention
                     )
 
                 if not ctx.guild.chunked:
@@ -1351,9 +1351,19 @@ class Moderation(Cog):
 
                     word = "to" if action == "add" else "from"
                     pending_message = await ctx.neutral(
-                        f"Starting to **{action}** {role.mention} "
-                        f"{word} {plural(len(members), md='`'):member}...",
-                        f"This will take around **{format_timespan(len(members))}**",
+                        await ctx.bot.get_text(
+                            "moderation.role.mass.STARTING",
+                            ctx,
+                            action=action,
+                            role=role.mention,
+                            word=word,
+                            count=len(members)
+                        ),
+                        await ctx.bot.get_text(
+                            "moderation.role.mass.DURATION",
+                            ctx,
+                            timespan=format_timespan(len(members))
+                        ),
                     )
 
                     failed: List[Member] = []
@@ -1399,11 +1409,26 @@ class Moderation(Cog):
                     span.set_attribute("members_failed", len(failed))
 
                     result = [
-                        f"{action.title()[:5]}ed {role.mention} {word} {plural(success_count, md='`'):member}"
+                        await ctx.bot.get_text(
+                            "moderation.role.mass.SUCCESS",
+                            ctx,
+                            action_past=action.title()[:5]+"ed",
+                            role=role.mention,
+                            word=word,
+                            count=success_count
+                        )
                     ]
                     if failed:
                         result.append(
-                            f"Failed {action[:5]}ing {role.mention} {word} {plural(len(failed), md='`'):member}: {', '.join(member.mention for member in failed)}"
+                            await ctx.bot.get_text(
+                                "moderation.role.mass.FAILED",
+                                ctx,
+                                action_short=action[:5],
+                                role=role.mention,
+                                word=word,
+                                count=len(failed),
+                                failed_members=', '.join(member.mention for member in failed)
+                            )
                         )
 
                     return await ctx.approve(*result)
@@ -1437,7 +1462,14 @@ class Moderation(Cog):
             try:
                 with ROLE_ACTION_DURATION.labels(action="add").time():
                     if role in member.roles:
-                        return await ctx.warn(f"{member.mention} already has {role.mention}!")
+                        return await ctx.warn(
+                            await ctx.bot.get_text(
+                                "moderation.role.add.ALREADY_HAS",
+                                ctx,
+                                member=member.mention,
+                                role=role.mention
+                            )
+                        )
 
                     if await self.is_immune(ctx, member):
                         return
@@ -1450,12 +1482,16 @@ class Moderation(Cog):
                     except Exception as e:
                         span.record_exception(e)
 
-                    ROLE_METRICS.labels(
-                        action="add",
-                        guild_id=str(ctx.guild.id)
-                    ).inc()
+                    ROLE_METRICS.labels(action="add", guild_id=str(ctx.guild.id)).inc()
 
-                    return await ctx.approve(f"Added {role.mention} to {member.mention}")
+                    return await ctx.approve(
+                        await ctx.bot.get_text(
+                            "moderation.role.add.SUCCESS",
+                            ctx,
+                            role=role.mention,
+                            member=member.mention
+                        )
+                    )
 
             except Exception as e:
                 span.record_exception(e)
@@ -1473,7 +1509,14 @@ class Moderation(Cog):
             try:
                 with ROLE_ACTION_DURATION.labels(action="remove").time():
                     if role not in member.roles:
-                        return await ctx.warn(f"{member.mention} doesn't have {role.mention}!")
+                        return await ctx.warn(
+                            await ctx.bot.get_text(
+                                "moderation.role.remove.DOESNT_HAVE",
+                                ctx,
+                                member=member.mention,
+                                role=role.mention
+                            )
+                        )
 
                     if await self.is_immune(ctx, member):
                         return
@@ -1486,12 +1529,16 @@ class Moderation(Cog):
                     except Exception as e:
                         span.record_exception(e)
 
-                    ROLE_METRICS.labels(
-                        action="remove",
-                        guild_id=str(ctx.guild.id)
-                    ).inc()
+                    ROLE_METRICS.labels(action="remove", guild_id=str(ctx.guild.id)).inc()
 
-                    return await ctx.approve(f"Removed {role.mention} from {member.mention}")
+                    return await ctx.approve(
+                        await ctx.bot.get_text(
+                            "moderation.role.remove.SUCCESS",
+                            ctx,
+                            role=role.mention,
+                            member=member.mention
+                        )
+                    )
 
             except Exception as e:
                 span.record_exception(e)
@@ -1511,7 +1558,13 @@ class Moderation(Cog):
                     role_ids = cast(Optional[List[int]], await self.bot.redis.getdel(key))
                     
                     if not role_ids:
-                        return await ctx.warn(f"No roles to restore for {member.mention}!")
+                        return await ctx.warn(
+                            await ctx.bot.get_text(
+                                "moderation.role.restore.NO_ROLES",
+                                ctx,
+                                member=member.mention
+                            )
+                        )
 
                     def validate_roles(role_ids, guild_roles, member_roles):
                         return [
@@ -1535,7 +1588,13 @@ class Moderation(Cog):
                     roles = [r for r in roles if await StrictRole().check(ctx, r)]
 
                     if not roles:
-                        return await ctx.warn(f"{member.mention} doesn't have any previous roles!")
+                        return await ctx.warn(
+                            await ctx.bot.get_text(
+                                "moderation.role.restore.NO_PREVIOUS",
+                                ctx,
+                                member=member.mention
+                            )
+                        )
 
                     try:
                         await ModConfig.sendlogs(self.bot, "role restore", ctx.author, member, "No reason provided")
@@ -1545,13 +1604,15 @@ class Moderation(Cog):
                     reason = f"Restoration of previous roles by {ctx.author.name} ({ctx.author.id})"
                     await member.add_roles(*roles, reason=reason, atomic=True)
 
-                    ROLE_METRICS.labels(
-                        action="restore",
-                        guild_id=str(ctx.guild.id)
-                    ).inc(len(roles))
+                    ROLE_METRICS.labels(action="restore", guild_id=str(ctx.guild.id)).inc(len(roles))
 
                     return await ctx.approve(
-                        f"Restored {human_join([role.mention for role in roles], final='and')} to {member.mention}"
+                        await ctx.bot.get_text(
+                            "moderation.role.restore.SUCCESS",
+                            ctx,
+                            roles=human_join([role.mention for role in roles], final='and'),
+                            member=member.mention
+                        )
                     )
 
             except Exception as e:
@@ -1570,15 +1631,17 @@ class Moderation(Cog):
             try:
                 with ROLE_ACTION_DURATION.labels(action="create").time():
                     if len(ctx.guild.roles) >= 250:
-                        return await ctx.warn("This server has too many roles! (`250`)")
+                        return await ctx.warn(
+                            await ctx.bot.get_text("moderation.role.create.TOO_MANY", ctx)
+                        )
 
                     config = await Settings.fetch(self.bot, ctx.guild)
                     if (config and config.role and not config.is_whitelisted(ctx.author) 
                         and await config.check_threshold(self.bot, ctx.author, "role")):
                         await strip_roles(ctx.author, dangerous=True, reason="Antinuke role threshold reached")
                         return await ctx.warn(
-                            "You've exceeded the antinuke threshold for **role creation**!",
-                            "Your **administrative permissions** have been revoked"
+                            await ctx.bot.get_text("moderation.role.create.ANTINUKE.THRESHOLD", ctx),
+                            await ctx.bot.get_text("moderation.role.create.ANTINUKE.REVOKED", ctx)
                         )
 
                     reason = f"Created by {ctx.author.name} ({ctx.author.id})"
@@ -1589,12 +1652,15 @@ class Moderation(Cog):
                         reason=reason
                     )
 
-                    ROLE_METRICS.labels(
-                        action="create",
-                        guild_id=str(ctx.guild.id)
-                    ).inc()
+                    ROLE_METRICS.labels(action="create", guild_id=str(ctx.guild.id)).inc()
 
-                    return await ctx.approve(f"Successfully created {role.mention}")
+                    return await ctx.approve(
+                        await ctx.bot.get_text(
+                            "moderation.role.create.SUCCESS",
+                            ctx,
+                            role=role.mention
+                        )
+                    )
 
             except Exception as e:
                 span.record_exception(e)
@@ -1612,7 +1678,12 @@ class Moderation(Cog):
                 with ROLE_ACTION_DURATION.labels(action="delete").time():
                     if role.members:
                         await ctx.prompt(
-                            f"{role.mention} has {plural(len(role.members), md='`'):member}, are you sure you want to delete it?"
+                            await ctx.bot.get_text(
+                                "moderation.role.delete.CONFIRM",
+                                ctx,
+                                role=role.mention,
+                                count=len(role.members)
+                            )
                         )
 
                     config = await Settings.fetch(self.bot, ctx.guild)
@@ -1620,17 +1691,12 @@ class Moderation(Cog):
                         and await config.check_threshold(self.bot, ctx.author, "role")):
                         await strip_roles(ctx.author, dangerous=True, reason="Antinuke role threshold reached")
                         return await ctx.warn(
-                            "You've exceeded the antinuke threshold for **role deletion**!",
-                            "Your **administrative permissions** have been revoked"
+                            await ctx.bot.get_text("moderation.role.delete.ANTINUKE.THRESHOLD", ctx),
+                            await ctx.bot.get_text("moderation.role.delete.ANTINUKE.REVOKED", ctx)
                         )
 
                     await role.delete(reason=f"Deleted by {ctx.author.name} ({ctx.author.id})")
-                    
-                    ROLE_METRICS.labels(
-                        action="delete",
-                        guild_id=str(ctx.guild.id)
-                    ).inc()
-                    
+                    ROLE_METRICS.labels(action="delete", guild_id=str(ctx.guild.id)).inc()
                     return await ctx.check()
 
             except Exception as e:
@@ -1656,7 +1722,14 @@ class Moderation(Cog):
                         guild_id=str(ctx.guild.id)
                     ).inc()
                     
-                    return await ctx.approve(f"Changed {role.mention}'s color to `{color}`")
+                    return await ctx.approve(
+                        await ctx.bot.get_text(
+                            "moderation.role.color.SUCCESS",
+                            ctx,
+                            role=role.mention,
+                            color=color
+                        )
+                    )
 
             except Exception as e:
                 span.record_exception(e)
@@ -1706,7 +1779,12 @@ class Moderation(Cog):
                     ).inc()
                     
                     return await ctx.approve(
-                        f"{role.mention} is {'now' if role.hoist else 'no longer'} hoisted"
+                        await ctx.bot.get_text(
+                            "moderation.role.hoist.SUCCESS",
+                            ctx,
+                            role=role.mention,
+                            status='now' if role.hoist else 'no longer'
+                        )
                     )
 
             except Exception as e:
@@ -1732,7 +1810,12 @@ class Moderation(Cog):
                     ).inc()
                     
                     return await ctx.approve(
-                        f"{role.mention} is {'now' if role.mentionable else 'no longer'} mentionable"
+                        await ctx.bot.get_text(
+                            "moderation.role.mentionable.SUCCESS",
+                            ctx,
+                            role=role.mention,
+                            status='now' if role.mentionable else 'no longer'
+                        )
                     )
 
             except Exception as e:
@@ -2044,10 +2127,7 @@ class Moderation(Cog):
         *,
         reason: str = "No reason provided",
     ) -> Message:
-        """
-        Prevent members from sending messages.
-        """
-
+        """Prevent members from sending messages."""
         channel = cast(TextChannel | Thread, channel or ctx.channel)
         lock_role = ctx.guild.get_role(ctx.settings.lock_role_id) or ctx.guild.default_role
 
@@ -2057,7 +2137,13 @@ class Moderation(Cog):
             or isinstance(channel, TextChannel)
             and channel.overwrites_for(lock_role).send_messages is False 
         ):
-            return await ctx.warn(f"{channel.mention} is already locked!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.lockdown.ALREADY_LOCKED",
+                    ctx,
+                    channel=channel.mention
+                )
+            )
 
         if isinstance(channel, Thread):
             await channel.edit(
@@ -2073,7 +2159,13 @@ class Moderation(Cog):
                 reason=f"{ctx.author.name} / {reason}",
             )
 
-        return await ctx.approve(f"Successfully locked down {channel.mention}")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.lockdown.SUCCESS",
+                ctx,
+                channel=channel.mention
+            )
+        )
 
     @lockdown.command(name="all", example="idk why")
     @has_permissions(manage_roles=True)
@@ -2085,49 +2177,54 @@ class Moderation(Cog):
             try:
                 if not ctx.settings.lock_ignore:
                     await ctx.prompt(
-                        "Are you sure you want to lock **ALL** channels?",
-                        "You haven't ignored any important channels yet",
+                        await ctx.bot.get_text("moderation.lockdown.all.CONFIRM.TITLE", ctx),
+                        await ctx.bot.get_text("moderation.lockdown.all.CONFIRM.WARNING", ctx),
                     )
 
-                initial_message = await ctx.neutral("Locking down all channels...")
-                async with ctx.typing():
-                    start = perf_counter()
-                    
-                    channels_to_lock = [
-                        channel for channel in ctx.guild.text_channels
-                        if channel.overwrites_for(ctx.settings.lock_role).send_messages is not False
-                        and channel not in ctx.settings.lock_ignore
-                    ]
-                    
-                    batch_size = 10
-                    for i in range(0, len(channels_to_lock), batch_size):
-                        batch = channels_to_lock[i:i + batch_size]
-                        tasks = []
-                        
-                        for channel in batch:
-                            overwrite = channel.overwrites_for(ctx.settings.lock_role)
-                            overwrite.send_messages = False
-                            tasks.append(channel.set_permissions(
-                                ctx.settings.lock_role,
-                                overwrite=overwrite,
-                                reason=f"{ctx.author.name} / {reason} (SERVER LOCKDOWN)",
-                            ))
-                        
-                        await asyncio.gather(*tasks, return_exceptions=True)
+                initial_message = await ctx.neutral(
+                    await ctx.bot.get_text("moderation.lockdown.all.PROGRESS", ctx)
+                )
 
-                    duration = perf_counter() - start
-                    CHANNEL_METRICS.labels(
-                        action="lockdown_all",
-                        guild_id=str(ctx.guild.id)
-                    ).inc(len(channels_to_lock))
+                channels_to_lock = [
+                    channel for channel in ctx.guild.text_channels
+                    if channel.overwrites_for(ctx.settings.lock_role).send_messages is not False
+                    and channel not in ctx.settings.lock_ignore
+                ]
+                
+                batch_size = 10
+                for i in range(0, len(channels_to_lock), batch_size):
+                    batch = channels_to_lock[i:i + batch_size]
+                    tasks = []
                     
-                    span.set_attribute("channels_locked", len(channels_to_lock))
-                    span.set_attribute("duration_seconds", duration)
+                    for channel in batch:
+                        overwrite = channel.overwrites_for(ctx.settings.lock_role)
+                        overwrite.send_messages = False
+                        tasks.append(channel.set_permissions(
+                            ctx.settings.lock_role,
+                            overwrite=overwrite,
+                            reason=f"{ctx.author.name} / {reason} (SERVER LOCKDOWN)",
+                        ))
                     
-                    return await ctx.approve(
-                        f"Successfully locked down {plural(len(channels_to_lock), md='`'):channel} in `{duration:.2f}s`",
-                        patch=initial_message,
-                    )
+                    await asyncio.gather(*tasks, return_exceptions=True)
+
+                duration = perf_counter() - start
+                CHANNEL_METRICS.labels(
+                    action="lockdown_all",
+                    guild_id=str(ctx.guild.id)
+                ).inc(len(channels_to_lock))
+                
+                span.set_attribute("channels_locked", len(channels_to_lock))
+                span.set_attribute("duration_seconds", duration)
+                
+                return await ctx.approve(
+                    await ctx.bot.get_text(
+                        "moderation.lockdown.all.SUCCESS",
+                        ctx,
+                        count=len(channels_to_lock),
+                        duration=duration
+                    ),
+                    patch=initial_message,
+                )
 
             except Exception as e:
                 span.record_exception(e)
@@ -2144,7 +2241,13 @@ class Moderation(Cog):
             try:
                 with CHANNEL_METRICS.labels(action="lockdown_role_set").time():
                     await ctx.settings.update(lock_role_id=role.id)
-                    return await ctx.approve(f"Now locking {role.mention} from sending messages")
+                    return await ctx.approve(
+                        await ctx.bot.get_text(
+                            "moderation.lockdown.role.SUCCESS",
+                            ctx,
+                            role=role.mention
+                        )
+                    )
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR))
@@ -2159,12 +2262,24 @@ class Moderation(Cog):
             
             try:
                 if channel in ctx.settings.lock_ignore:
-                    return await ctx.warn(f"{channel.mention} is already being ignored!")
+                    return await ctx.warn(
+                        await ctx.bot.get_text(
+                            "moderation.lockdown.ignore.ALREADY_IGNORED",
+                            ctx,
+                            channel=channel.mention
+                        )
+                    )
 
                 with CHANNEL_METRICS.labels(action="lockdown_ignore_add").time():
                     ctx.settings.lock_ignore_ids.append(channel.id)
                     await ctx.settings.update()
-                    return await ctx.approve(f"Now ignoring {channel.mention} from lockdown")
+                    return await ctx.approve(
+                        await ctx.bot.get_text(
+                            "moderation.lockdown.ignore.SUCCESS",
+                            ctx,
+                            channel=channel.mention
+                        )
+                    )
                     
             except Exception as e:
                 span.record_exception(e)
@@ -2183,16 +2298,25 @@ class Moderation(Cog):
         *,
         channel: TextChannel,
     ) -> Message:
-        """
-        Remove a channel from being ignored.
-        """
-
+        """Remove a channel from being ignored."""
         if channel not in ctx.settings.lock_ignore:
-            return await ctx.warn(f"{channel.mention} isn't being ignored!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.lockdown.ignore.remove.NOT_IGNORED",
+                    ctx,
+                    channel=channel.mention
+                )
+            )
 
         ctx.settings.lock_ignore_ids.remove(channel.id)
         await ctx.settings.update()
-        return await ctx.approve(f"No longer ignoring {channel.mention} from lockdown")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.lockdown.ignore.remove.SUCCESS",
+                ctx,
+                channel=channel.mention
+            )
+        )
 
     @lockdown_ignore.command(
         name="list",
@@ -2200,12 +2324,11 @@ class Moderation(Cog):
     )
     @has_permissions(manage_roles=True)
     async def lockdown_ignore_list(self, ctx: Context) -> Message:
-        """
-        View all channels being ignored.
-        """
-
+        """View all channels being ignored."""
         if not ctx.settings.lock_ignore:
-            return await ctx.warn("No channels are being ignored!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.lockdown.ignore.list.NO_CHANNELS", ctx)
+            )
 
         paginator = Paginator(
             ctx,
@@ -2213,7 +2336,9 @@ class Moderation(Cog):
                 f"{channel.mention} (`{channel.id}`)"
                 for channel in ctx.settings.lock_ignore
             ],
-            embed=Embed(title="Ignored Channels"),
+            embed=Embed(
+                title=await ctx.bot.get_text("moderation.lockdown.ignore.list.TITLE", ctx)
+            ),
         )
         return await paginator.start()
 
@@ -2230,13 +2355,12 @@ class Moderation(Cog):
         *,
         reason: str = "No reason provided",
     ) -> Message:
-        """
-        Allow members to send messages.
-        """
-
+        """Allow members to send messages."""
         channel = cast(TextChannel | Thread, channel or ctx.channel)
         if not isinstance(channel, (TextChannel | Thread)):
-            return await ctx.warn("You can only unlock text channels!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.unlockdown.CHANNEL_TYPE", ctx)
+            )
 
         if (
             isinstance(channel, Thread)
@@ -2244,7 +2368,13 @@ class Moderation(Cog):
             or isinstance(channel, TextChannel)
             and channel.overwrites_for(ctx.settings.lock_role).send_messages is True
         ):
-            return await ctx.warn(f"{channel.mention} is already unlocked!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.unlockdown.ALREADY_UNLOCKED",
+                    ctx,
+                    channel=channel.mention
+                )
+            )
 
         if isinstance(channel, Thread):
             await channel.edit(
@@ -2260,7 +2390,13 @@ class Moderation(Cog):
                 reason=f"{ctx.author.name} / {reason}",
             )
 
-        return await ctx.approve(f"Successfully unlocked {channel.mention}")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.unlockdown.SUCCESS",
+                ctx,
+                channel=channel.mention
+            )
+        )
 
     @unlockdown.command(name="all", example="idk why")
     @has_permissions(manage_roles=True)
@@ -2272,49 +2408,54 @@ class Moderation(Cog):
             try:
                 if not ctx.settings.lock_ignore:
                     await ctx.prompt(
-                        "Are you sure you want to unlock **ALL** channels?",
-                        "You haven't ignored any important channels yet",
+                        await ctx.bot.get_text("moderation.unlockdown.all.CONFIRM.TITLE", ctx),
+                        await ctx.bot.get_text("moderation.unlockdown.all.CONFIRM.WARNING", ctx),
                     )
 
-                initial_message = await ctx.neutral("Unlocking all channels...")
-                async with ctx.typing():
-                    start = perf_counter()
-                    
-                    channels_to_unlock = [
-                        channel for channel in ctx.guild.text_channels
-                        if channel.overwrites_for(ctx.settings.lock_role).send_messages is not True
-                        and channel not in ctx.settings.lock_ignore
-                    ]
-                    
-                    batch_size = 10
-                    for i in range(0, len(channels_to_unlock), batch_size):
-                        batch = channels_to_unlock[i:i + batch_size]
-                        tasks = []
-                        
-                        for channel in batch:
-                            overwrite = channel.overwrites_for(ctx.settings.lock_role)
-                            overwrite.send_messages = True
-                            tasks.append(channel.set_permissions(
-                                ctx.settings.lock_role,
-                                overwrite=overwrite,
-                                reason=f"{ctx.author.name} / {reason} (SERVER UNLOCKDOWN)",
-                            ))
-                        
-                        await asyncio.gather(*tasks, return_exceptions=True)
+                initial_message = await ctx.neutral(
+                    await ctx.bot.get_text("moderation.unlockdown.all.PROGRESS", ctx)
+                )
 
-                    duration = perf_counter() - start
-                    CHANNEL_METRICS.labels(
-                        action="unlockdown_all",
-                        guild_id=str(ctx.guild.id)
-                    ).inc(len(channels_to_unlock))
+                channels_to_unlock = [
+                    channel for channel in ctx.guild.text_channels
+                    if channel.overwrites_for(ctx.settings.lock_role).send_messages is not True
+                    and channel not in ctx.settings.lock_ignore
+                ]
+                
+                batch_size = 10
+                for i in range(0, len(channels_to_unlock), batch_size):
+                    batch = channels_to_unlock[i:i + batch_size]
+                    tasks = []
                     
-                    span.set_attribute("channels_unlocked", len(channels_to_unlock))
-                    span.set_attribute("duration_seconds", duration)
+                    for channel in batch:
+                        overwrite = channel.overwrites_for(ctx.settings.lock_role)
+                        overwrite.send_messages = True
+                        tasks.append(channel.set_permissions(
+                            ctx.settings.lock_role,
+                            overwrite=overwrite,
+                            reason=f"{ctx.author.name} / {reason} (SERVER UNLOCKDOWN)",
+                        ))
                     
-                    return await ctx.approve(
-                        f"Successfully unlocked {plural(len(channels_to_unlock), md='`'):channel} in `{duration:.2f}s`",
-                        patch=initial_message,
-                    )
+                    await asyncio.gather(*tasks, return_exceptions=True)
+
+                duration = perf_counter() - start
+                CHANNEL_METRICS.labels(
+                    action="unlockdown_all",
+                    guild_id=str(ctx.guild.id)
+                ).inc(len(channels_to_unlock))
+                
+                span.set_attribute("channels_unlocked", len(channels_to_unlock))
+                span.set_attribute("duration_seconds", duration)
+                
+                return await ctx.approve(
+                    await ctx.bot.get_text(
+                        "moderation.unlockdown.all.SUCCESS",
+                        ctx,
+                        count=len(channels_to_unlock),
+                        duration=duration
+                    ),
+                    patch=initial_message,
+                )
 
             except Exception as e:
                 span.record_exception(e)
@@ -2466,13 +2607,27 @@ class Moderation(Cog):
 
         channel = cast(TextChannel, channel or ctx.channel)
         if not isinstance(channel, TextChannel):
-            return await ctx.warn("You can only set the slowmode for text channels!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.slowmode.disable.TEXT_ONLY", ctx)
+            )
 
         if channel.slowmode_delay == 0:
-            return await ctx.warn(f"{channel.mention} already has slowmode disabled!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.slowmode.disable.ALREADY_DISABLED",
+                    ctx,
+                    channel=channel.mention
+                )
+            )
 
         await channel.edit(slowmode_delay=0)
-        return await ctx.approve(f"Disabled slowmode for {channel.mention}")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.slowmode.disable.SUCCESS",
+                ctx,
+                channel=channel.mention
+            )
+        )
 
     @hybrid_command(aliases=["naughty", "sfw"], example="#nsfw")
     @has_permissions(manage_channels=True)
@@ -2487,14 +2642,21 @@ class Moderation(Cog):
 
         channel = cast(TextChannel, channel or ctx.channel)
         if not isinstance(channel, TextChannel):
-            return await ctx.warn("You can only mark text channels as NSFW!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.nsfw.TEXT_ONLY", ctx)
+            )
 
         await channel.edit(
             nsfw=not channel.is_nsfw(),
             reason=f"Changed by {ctx.author.name} ({ctx.author.id})",
         )
         return await ctx.approve(
-            f"Marked {channel.mention} as **{'NSFW' if channel.is_nsfw() else 'SFW'}**"
+            await ctx.bot.get_text(
+                "moderation.nsfw.SUCCESS",
+                ctx,
+                channel=channel.mention,
+                status='NSFW' if channel.is_nsfw() else 'SFW'
+            )
         )
 
     @hybrid_group(invoke_without_command=True, example="#general hi")
@@ -2512,64 +2674,89 @@ class Moderation(Cog):
 
         channel = cast(TextChannel, channel or ctx.channel)
         if not isinstance(channel, TextChannel):
-            return await ctx.warn("You can only set the topic for text channels!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.topic.TEXT_ONLY", ctx)
+            )
 
         try:
             await channel.edit(
-                topic=text, reason=f"Changed by {ctx.author.name} ({ctx.author.id})"
+                topic=text,
+                reason=f"Changed by {ctx.author.name} ({ctx.author.id})"
             )
         except RateLimited as exc:
             retry_after = timedelta(seconds=exc.retry_after)
             return await ctx.warn(
-                f"The channel is currently ratelimited, try again in **{precisedelta(retry_after)}**!"
+                await ctx.bot.get_text(
+                    "moderation.topic.RATELIMITED",
+                    ctx,
+                    retry_after=precisedelta(retry_after)
+                )
             )
-
         except HTTPException as exc:
             return await ctx.warn(
-                f"Failed to set the topic for {channel.mention}!", codeblock(exc.text)
+                await ctx.bot.get_text("moderation.topic.FAILED", ctx, channel=channel.mention),
+                codeblock(exc.text)
             )
 
-        return await ctx.approve(f"Set the topic for {channel.mention} to `{text}`")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.topic.SUCCESS",
+                ctx,
+                channel=channel.mention,
+                text=text
+            )
+        )
 
-    @topic.command(
-        name="remove",
-        aliases=["delete", "del", "rm"],
-        example="#general",
-    )
+    @topic.command(name="remove", aliases=["delete", "del", "rm"], example="#general")
     @has_permissions(manage_channels=True)
-    async def topic_remove(
-        self,
-        ctx: Context,
-        channel: Optional[TextChannel],
-    ) -> Message:
-        """
-        Remove a channel's topic.
-        """
-
+    async def topic_remove(self, ctx: Context, channel: Optional[TextChannel]) -> Message:
+        """Remove a channel's topic."""
         channel = cast(TextChannel, channel or ctx.channel)
         if not isinstance(channel, TextChannel):
-            return await ctx.warn("You can only remove the topic for text channels!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.topic.remove.TEXT_ONLY", ctx)
+            )
 
         if not channel.topic:
-            return await ctx.warn(f"{channel.mention} doesn't have a topic!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.topic.remove.NO_TOPIC",
+                    ctx,
+                    channel=channel.mention
+                )
+            )
 
         try:
             await channel.edit(
-                topic="", reason=f"Changed by {ctx.author.name} ({ctx.author.id})"
+                topic="",
+                reason=f"Changed by {ctx.author.name} ({ctx.author.id})"
             )
         except RateLimited as exc:
             retry_after = timedelta(seconds=exc.retry_after)
             return await ctx.warn(
-                f"The channel is currently ratelimited, try again in **{precisedelta(retry_after)}**!"
+                await ctx.bot.get_text(
+                    "moderation.topic.remove.RATELIMITED",
+                    ctx,
+                    retry_after=precisedelta(retry_after)
+                )
             )
-
         except HTTPException as exc:
             return await ctx.warn(
-                f"Failed to remove the topic for {channel.mention}!",
-                codeblock(exc.text),
+                await ctx.bot.get_text(
+                    "moderation.topic.remove.FAILED",
+                    ctx,
+                    channel=channel.mention
+                ),
+                codeblock(exc.text)
             )
 
-        return await ctx.approve(f"Removed the topic for {channel.mention}")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.topic.remove.SUCCESS",
+                ctx,
+                channel=channel.mention
+            )
+        )
 
     @hybrid_group(invoke_without_command=True, example="@x #general")
     @has_permissions(manage_channels=True)
@@ -2580,7 +2767,9 @@ class Moderation(Cog):
             try:
                 if not channel:
                     if not ctx.author.voice or not ctx.author.voice.channel:
-                        return await ctx.warn("You aren't in a voice channel!")
+                        return await ctx.warn(
+                            await ctx.bot.get_text("moderation.drag.NO_VOICE", ctx)
+                        )
                     channel = ctx.author.voice.channel
 
                 span.set_attribute("target_channel_id", str(channel.id))
@@ -2801,21 +2990,17 @@ class Moderation(Cog):
                 with MODERATION_METRICS.labels(action="kick").time():
                     if member.premium_since:
                         await ctx.prompt(
-                            f"Are you sure you want to **kick** {member.mention}?",
-                            "They are currently boosting the server!",
+                            await ctx.bot.get_text("moderation.kick.CONFIRM_BOOSTER", ctx, member=member.mention),
+                            await ctx.bot.get_text("moderation.kick.BOOSTER_WARNING", ctx)
                         )
 
                     config = await Settings.fetch(self.bot, ctx.guild)
                     if (config and config.kick and not config.is_whitelisted(ctx.author) and 
                         await config.check_threshold(self.bot, ctx.author, "kick")):
-                        await strip_roles(
-                            ctx.author, 
-                            dangerous=True, 
-                            reason="Antinuke kick threshold reached"
-                        )
+                        await strip_roles(ctx.author, dangerous=True, reason="Antinuke kick threshold reached")
                         return await ctx.warn(
-                            "You've exceeded the antinuke threshold for **kicks**!",
-                            "Your **administrative permissions** have been revoked",
+                            await ctx.bot.get_text("moderation.kick.ANTINUKE.THRESHOLD", ctx),
+                            await ctx.bot.get_text("moderation.kick.ANTINUKE.REVOKED", ctx)
                         )
 
                     async with ctx.typing():
@@ -2851,27 +3036,15 @@ class Moderation(Cog):
                 span.set_status(trace.Status(trace.StatusCode.ERROR))
                 raise
 
-    @command(
-        aliases=["hb"],
-        example="@x 1d bot owner",
-    )
+    @command(aliases=["hb"], example="@x 1d bot owner")
     @has_permissions(ban_members=True)
-    async def hardban(
-        self,
-        ctx: Context,
-        user: Member | User,
-        history: Optional[int] = 0,
-        *,
-        reason: str = "No reason provided",
-    ) -> Optional[Message]:
-        """
-        Permanently ban a user from the server.
-
-        Only the server owner is able to unban them.
-        Re-running this command will remove the hard ban.
-        """
+    async def hardban(self, ctx: Context, user: Member | User,
+                     history: Optional[int] = 0, *, reason: str = "No reason provided") -> Optional[Message]:
+        """Permanently ban a user from the server."""
         if history > 7:
-            return await ctx.warn("You can only delete messages up to **7 days**!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.hardban.HISTORY_LIMIT", ctx)
+            )
 
         if isinstance(user, Member):
             await TouchableMember().check(ctx, user)
@@ -2882,88 +3055,69 @@ class Moderation(Cog):
         config = await Settings.fetch(self.bot, ctx.guild)
         if not config.is_trusted(ctx.author):
             return await ctx.warn(
-                "You must be a **trusted administrator** to use this command!"
+                await ctx.bot.get_text("moderation.hardban.TRUSTED_ONLY", ctx)
             )
 
         hardban = await self.bot.db.fetchrow(
-            """
-            SELECT * FROM 
-            hardban WHERE 
-            guild_id = $1 
-            AND user_id = $2
-            """,
+            "SELECT * FROM hardban WHERE guild_id = $1 AND user_id = $2",
             ctx.guild.id,
             user.id,
         )
 
         if hardban:
             await self.bot.db.execute(
-                """
-                DELETE FROM hardban 
-                WHERE guild_id = $1 
-                AND user_id = $2
-                """,
+                "DELETE FROM hardban WHERE guild_id = $1 AND user_id = $2",
                 ctx.guild.id,
                 user.id,
             )
             with suppress(NotFound):
-                await ctx.guild.unban(
-                    user, reason=f"Hard ban removed by {ctx.author} ({ctx.author.id})"
-                )
+                await ctx.guild.unban(user, reason=f"Hard ban removed by {ctx.author} ({ctx.author.id})")
 
             try:
-                await ModConfig.sendlogs(self.bot, "hardunban", ctx.author, user, reason)  # type: ignore
+                await ModConfig.sendlogs(self.bot, "hardunban", ctx.author, user, reason)
             except:
                 pass
-            return await ctx.approve(f"Hard ban removed for **{user}**")
+
+            return await ctx.approve(
+                await ctx.bot.get_text("moderation.hardban.REMOVED", ctx, user=user)
+            )
 
         await self.bot.db.execute(
-            """
-            INSERT INTO hardban 
-            (guild_id, user_id) 
-            VALUES ($1, $2)
-            """,
+            "INSERT INTO hardban (guild_id, user_id) VALUES ($1, $2)",
             ctx.guild.id,
             user.id,
         )
-        await ModConfig.sendlogs(self.bot, "hardban", ctx.author, user, reason)  # type: ignore
-        await ctx.guild.ban(
-            user,
-            delete_message_days=history, 
-            reason=f"{ctx.author} / {reason}",
-        )
+        await ModConfig.sendlogs(self.bot, "hardban", ctx.author, user, reason)
+        await ctx.guild.ban(user, delete_message_days=history, reason=f"{ctx.author} / {reason}")
+
         if ctx.settings.invoke_ban:
             script = Script(
                 ctx.settings.invoke_ban,
-                [
-                    ctx.guild,
-                    ctx.channel,
-                    user,
-                    (reason, "reason"),
-                    (ctx.author, "moderator"),
-                ],
+                [ctx.guild, ctx.channel, user, (reason, "reason"), (ctx.author, "moderator")]
             )
             with suppress(HTTPException):
                 await script.send(ctx)
 
-        return await ctx.check()
+        return await ctx.approve(
+            await ctx.bot.get_text("moderation.hardban.SUCCESS", ctx, user=user)
+        )
 
     @command(name="hardbanlist", aliases=["ls"])
     @has_permissions(ban_members=True)
     async def hardban_list(self, ctx: Context) -> Message:
-        """
-        View all hard banned users.
-        """
+        """View all hard banned users."""
         hardban = await self.bot.db.fetch("SELECT user_id FROM hardban WHERE guild_id = $1", ctx.guild.id)
 
         config = await Settings.fetch(self.bot, ctx.guild)
         if not config.is_trusted(ctx.author):
             return await ctx.warn(
-                "You must be a **trusted administrator** to use this command!"
+                await ctx.bot.get_text("moderation.hardbanlist.TRUSTED_ONLY", ctx)
             )
 
         if not hardban:
-            return await ctx.warn("No users are hard banned!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.hardbanlist.NO_USERS", ctx)
+            )
         
         paginator = Paginator(
             ctx,
@@ -2971,7 +3125,9 @@ class Moderation(Cog):
                 f"**{self.bot.get_user(int(user_id['user_id'])) or 'Unknown User'}** (`{user_id['user_id']}`)"
                 for user_id in hardban
             ],
-            embed=Embed(title="Hard Banned Users"),
+            embed=Embed(
+                title=await ctx.bot.get_text("moderation.hardbanlist.TITLE", ctx)
+            ),
         )
         return await paginator.start()
 
@@ -3054,23 +3210,14 @@ class Moderation(Cog):
             return
         
         await self.bot.db.execute(
-            """
-            INSERT INTO forcenick (guild_id, user_id, nickname)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (guild_id, user_id)
-            DO UPDATE SET nickname = $3
-            """,
-            ctx.guild.id,
-            member.id,
-            nickname,
+            "INSERT INTO forcenick (guild_id, user_id, nickname) VALUES ($1, $2, $3) "
+            "ON CONFLICT (guild_id, user_id) DO UPDATE SET nickname = $3",
+            ctx.guild.id, member.id, nickname,
         )
 
-        await member.edit(
-            nick=nickname,
-            reason=f"{ctx.author} ({ctx.author.id})",
-        )
+        await member.edit(nick=nickname, reason=f"{ctx.author} ({ctx.author.id})")
         try:
-            await ModConfig.sendlogs(self.bot, "forcenick", ctx.author, member, "No reason provided")  # type: ignore
+            await ModConfig.sendlogs(self.bot, "forcenick", ctx.author, member, "No reason provided")
         except:
             pass
         return await ctx.check()
@@ -3169,22 +3316,16 @@ class Moderation(Cog):
 
         if member.premium_since:
             await ctx.prompt(
-                f"Are you sure you want to **ban** {member.mention}?",
-                "They are currently boosting the server!",
+                await ctx.bot.get_text("moderation.softban.BOOSTER_CONFIRM", ctx, member=member.mention),
+                await ctx.bot.get_text("moderation.softban.BOOSTER_WARNING", ctx)
             )
 
         config = await Settings.fetch(self.bot, ctx.guild)
-        if (
-            config.ban
-            and not config.is_whitelisted(ctx.author)
-            and await config.check_threshold(self.bot, ctx.author, "ban")
-        ):
-            await strip_roles(
-                ctx.author, dangerous=True, reason="Antinuke ban threshold reached"
-            )
+        if config.ban and not config.is_whitelisted(ctx.author) and await config.check_threshold(self.bot, ctx.author, "ban"):
+            await strip_roles(ctx.author, dangerous=True, reason="Antinuke ban threshold reached")
             return await ctx.warn(
-                "You've exceeded the antinuke threshold for **bans**!",
-                "Your **administrative permissions** have been revoked",
+                await ctx.bot.get_text("moderation.softban.ANTINUKE.THRESHOLD", ctx),
+                await ctx.bot.get_text("moderation.softban.ANTINUKE.REVOKED", ctx)
             )
 
         try:
@@ -3230,25 +3371,22 @@ class Moderation(Cog):
         Unban a user from the server.
         """
         hardban = await self.bot.db.fetchrow(
-            """
-            SELECT * FROM 
-            hardban WHERE 
-            guild_id = $1 
-            AND user_id = $2
-            """,
-            ctx.guild.id,
-            user.id,
+            "SELECT * FROM hardban WHERE guild_id = $1 AND user_id = $2",
+            ctx.guild.id, user.id
         )
         config = await Settings.fetch(self.bot, ctx.guild)
         if hardban and not config.is_trusted(ctx.author):
             return await ctx.warn(
-                "You must be a **trusted administrator** to unban hard banned users!"
+                await ctx.bot.get_text("moderation.unban.TRUSTED_ONLY", ctx)
             )
 
         try:
             await ctx.guild.unban(user, reason=f"{ctx.author} / {reason}")
         except NotFound:
-            return await ctx.warn("That user is not banned!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.unban.NOT_BANNED", ctx)
+            )
+
         try:
             await ModConfig.sendlogs(self.bot, "unban", ctx.author, user, reason)  # type: ignore
         except:
@@ -3305,16 +3443,28 @@ class Moderation(Cog):
                     )
 
                     if not users:
-                        return await ctx.warn("There are no banned users!")
+                        return await ctx.warn(
+                            await ctx.bot.get_text("moderation.unban.all.NO_USERS", ctx)
+                        )
 
                     span.set_attribute("users_to_unban", len(users))
                     await ctx.prompt(
-                        f"Are you sure you want to unban {plural(users, md='`'):user}?",
+                        await ctx.bot.get_text(
+                            "moderation.unban.all.CONFIRM",
+                            ctx,
+                            count=len(users)
+                        )
                     )
 
                     batch_size = 50
                     total_unbanned = 0
-                    initial_message = await ctx.neutral(f"Unbanning {len(users)} users...")
+                    initial_message = await ctx.neutral(
+                        await ctx.bot.get_text(
+                            "moderation.unban.all.INITIAL",
+                            ctx,
+                            count=len(users)
+                        )
+                    )
 
                     async with ctx.typing():
                         for i in range(0, len(users), batch_size):
@@ -3335,7 +3485,12 @@ class Moderation(Cog):
                             
                             if i % (batch_size * 2) == 0:
                                 await initial_message.edit(
-                                    content=f"Unbanning users... ({total_unbanned}/{len(users)})"
+                                    content=await ctx.bot.get_text(
+                                        "moderation.unban.all.PROGRESS",
+                                        ctx,
+                                        current=total_unbanned,
+                                        total=len(users)
+                                    )
                                 )
                             
                             await asyncio.sleep(0.5)
@@ -3347,7 +3502,11 @@ class Moderation(Cog):
 
                     span.set_attribute("users_unbanned", total_unbanned)
                     return await ctx.approve(
-                        f"Successfully unbanned {plural(total_unbanned, md='`'):user}",
+                        await ctx.bot.get_text(
+                            "moderation.unban.all.SUCCESS",
+                            ctx,
+                            count=total_unbanned
+                        ),
                         patch=initial_message
                     )
 
@@ -3428,22 +3587,13 @@ class Moderation(Cog):
             return
 
         await self.bot.db.execute(
-            """
-            DELETE FROM forcenick 
-            WHERE guild_id = $1 
-            AND user_id = $2
-            """,
-            ctx.guild.id,
-            member.id,
+            "DELETE FROM forcenick WHERE guild_id = $1 AND user_id = $2",
+            ctx.guild.id, member.id
         )
 
-        await member.edit(
-            nick=None,
-            reason=f"{ctx.author} ({ctx.author.id})",
-        )
-
+        await member.edit(nick=None, reason=f"{ctx.author} ({ctx.author.id})")
         try:
-            await ModConfig.sendlogs(self.bot, "nickname remove", ctx.author, member, "None")  # type: ignore
+            await ModConfig.sendlogs(self.bot, "nickname remove", ctx.author, member, "None")
         except:
             pass
         return await ctx.check()
@@ -3472,26 +3622,16 @@ class Moderation(Cog):
             return
         
         await self.bot.db.execute(
-            """
-            INSERT INTO forcenick (guild_id, user_id, nickname)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (guild_id, user_id)
-            DO UPDATE SET nickname = $3
-            """,
-            ctx.guild.id,
-            member.id,
-            nickname,
+            "INSERT INTO forcenick (guild_id, user_id, nickname) VALUES ($1, $2, $3) "
+            "ON CONFLICT (guild_id, user_id) DO UPDATE SET nickname = $3",
+            ctx.guild.id, member.id, nickname
         )
 
-        await member.edit(
-            nick=nickname,
-            reason=f"{ctx.author} ({ctx.author.id})",
-        )
+        await member.edit(nick=nickname, reason=f"{ctx.author} ({ctx.author.id})")
         try:
-            await ModConfig.sendlogs(self.bot, "forcenick", ctx.author, member, "No reason provided")  # type: ignore
+            await ModConfig.sendlogs(self.bot, "forcenick", ctx.author, member, "No reason provided")
         except:
             pass
-        
         return await ctx.check()
 
     @nickname_force.command(
@@ -3512,19 +3652,11 @@ class Moderation(Cog):
         Cancel a member's forced nickname.
         """
         await self.bot.db.execute(
-            """
-            DELETE FROM forcenick 
-            WHERE guild_id = $1 
-            AND user_id = $2
-            """,
-            ctx.guild.id,
-            member.id,
+            "DELETE FROM forcenick WHERE guild_id = $1 AND user_id = $2",
+            ctx.guild.id, member.id
         )
 
-        await member.edit(
-            nick=None,
-            reason=f"{ctx.author} ({ctx.author.id})",
-        )
+        await member.edit(nick=None, reason=f"{ctx.author} ({ctx.author.id})")
         try:
             await ModConfig.sendlogs(self.bot, "forcenick remove", ctx.author, member, "No reason provided")  # type: ignore
         except:
@@ -3610,19 +3742,26 @@ class Moderation(Cog):
             )
         )
         if not members:
-            return await ctx.warn("No members are currently timed out!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.timeout.list.NO_MEMBERS", ctx)
+            )
 
         paginator = Paginator(
             ctx,
             entries=[
-                f"{member.mention} - expires {format_dt(member.timed_out_until or utcnow(), 'R')}"
+                await ctx.bot.get_text(
+                    "moderation.timeout.list.ENTRY",
+                    ctx,
+                    member=member.mention,
+                    expires=format_dt(member.timed_out_until or utcnow(), 'R')
+                )
                 for member in sorted(
                     members,
                     key=lambda member: member.timed_out_until or utcnow(),
                 )
             ],
             embed=Embed(
-                title="Timed Out Members",
+                title=await ctx.bot.get_text("moderation.timeout.list.TITLE", ctx)
             ),
         )
         return await paginator.start()
@@ -3654,12 +3793,11 @@ class Moderation(Cog):
         """
 
         if not member.is_timed_out():
-            return await ctx.warn("That member isn't timed out!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.untimeout.NOT_TIMED_OUT", ctx)
+            )
 
-        await member.timeout(
-                    None,
-            reason=f"{ctx.author} / {reason}",
-        )
+        await member.timeout(None, reason=f"{ctx.author} / {reason}")
         if ctx.settings.invoke_untimeout:
             script = Script(
                 ctx.settings.invoke_untimeout,
@@ -3762,10 +3900,7 @@ class Moderation(Cog):
     )
     @has_permissions(manage_expressions=True)
     async def emoji(self, ctx: Context, emoji: PartialEmoji | str) -> Message:
-        """
-        Various emoji management commands.
-        """
-
+        """Various emoji management commands."""
         if isinstance(emoji, str):
             url, name = unicode_emoji(emoji)
         else:
@@ -3780,74 +3915,70 @@ class Moderation(Cog):
 
         image, suffix = await enlarge_emoji(buffer, suffix[1:])
         if not image:
-            return await ctx.warn("There was an issue downloading that emoji!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.emoji.DOWNLOAD_ERROR", ctx)
+            )
 
         try:
             return await ctx.send(
-                file=File(
-                    BytesIO(image),
-                    filename=f"{name}.{suffix}",
-                ),
+                file=File(BytesIO(image), filename=f"{name}.{suffix}")
             )
         except HTTPException:
-            return await ctx.warn("The enlarged emoji was too large to send!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.emoji.TOO_LARGE", ctx)
+            )
 
     @emoji.command(name="information", aliases=["i", "info", "details"])
     async def emoji_information(self, ctx: Context, emoji: PartialEmoji) -> Message:
-        """
-        View detailed information about an emoji.
-        """
+        """View detailed information about an emoji."""
         button = Button(
-            label="Emoji URL",
+            label=await ctx.bot.get_text("moderation.emoji.information.BUTTON_LABEL", ctx),
             style=discord.ButtonStyle.gray,
             emoji=emoji,
             url=f"{emoji.url}",
         )
 
         embed = Embed(
-            title=f"{emoji.name}",
+            title=await ctx.bot.get_text(
+                "moderation.emoji.information.TITLE",
+                ctx,
+                name=emoji.name
+            )
         )
         embed.set_thumbnail(url=emoji.url)
         embed.add_field(
-            name="ID",
+            name=await ctx.bot.get_text("moderation.emoji.information.FIELDS.ID", ctx),
             value=emoji.id,
             inline=False,
         )
         embed.add_field(
-            name="Animated",
+            name=await ctx.bot.get_text("moderation.emoji.information.FIELDS.ANIMATED", ctx),
             value=emoji.animated,
             inline=False,
         )
         embed.add_field(
-            name="Code", 
-            value=f"`{emoji}`", 
+            name=await ctx.bot.get_text("moderation.emoji.information.FIELDS.CODE", ctx),
+            value=f"`{emoji}`",
             inline=False
         )
         embed.add_field(
-            name="Created At", 
+            name=await ctx.bot.get_text("moderation.emoji.information.FIELDS.CREATED_AT", ctx),
             value=format_dt(emoji.created_at, "R"),
             inline=False,
         )
         
         view = View()
         view.add_item(button)
-        
         return await ctx.send(embed=embed, view=view)
 
     @emoji.command(name="sticker")
     @has_permissions(manage_expressions=True)
-    async def emoji_sticker(
-        self, 
-        ctx: Context, 
-        name: Optional[Range[str, 2, 32]], 
-        emoji: PartialEmoji
-    ):
-        """
-        Convert a custom emoji to a sticker.
-        """
+    async def emoji_sticker(self, ctx: Context, name: Optional[Range[str, 2, 32]], 
+                          emoji: PartialEmoji):
+        """Convert a custom emoji to a sticker."""
         if len(ctx.guild.stickers) == ctx.guild.sticker_limit:
             return await ctx.warn(
-                "The server is at the **maximum** amount of stickers!"
+                await ctx.bot.get_text("moderation.emoji.sticker.STICKER_LIMIT", ctx)
             )
         
         try:
@@ -3861,62 +3992,63 @@ class Moderation(Cog):
         except RateLimited as exc:
             retry_after = timedelta(seconds=exc.retry_after)
             return await ctx.warn(
-                f"The server is currently ratelimited, try again in **{precisedelta(retry_after)}**!"
+                await ctx.bot.get_text(
+                    "moderation.emoji.sticker.RATELIMITED",
+                    ctx,
+                    retry_after=precisedelta(retry_after)
+                )
+            )
+        except HTTPException as exc:
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.emoji.sticker.FAILED", ctx),
+                codeblock(exc.text)
             )
 
-        except HTTPException as exc:
-            return await ctx.warn("Failed to create the sticker!", codeblock(exc.text))
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.emoji.sticker.SUCCESS",
+                ctx,
+                name=sticker.name,
+                url=sticker.url
+            )
+        )
 
-        return await ctx.approve(f"Created sticker [{sticker.name}]({sticker.url})")
-
-    @emoji.group(
-        name="add",
-        aliases=[
-            "create",
-            "upload",
-            "steal",
-        ],
-        invoke_without_command=True,
-    )
+    @emoji.group(name="add", aliases=["create", "upload", "steal"],
+                invoke_without_command=True)
     @has_permissions(manage_expressions=True)
-    async def emoji_add(
-        self,
-        ctx: Context,
-        image: PartialEmoji | PartialAttachment = parameter(
-            default=PartialAttachment.fallback,
-        ),
-        *,
-        name: Optional[Range[str, 2, 32]],
-    ) -> Optional[Message]:
-        """
-        Add an emoji to the server.
-        """
-
+    async def emoji_add(self, ctx: Context,
+                       image: PartialEmoji | PartialAttachment = parameter(
+                           default=PartialAttachment.fallback),
+                       *, name: Optional[Range[str, 2, 32]]) -> Optional[Message]:
+        """Add an emoji to the server."""
         if not image.url:
             return await ctx.send_help(ctx.command)
 
         elif len(ctx.guild.emojis) == ctx.guild.emoji_limit:
-            return await ctx.warn("The server is at the **maximum** amount of emojis!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.emoji.add.EMOJI_LIMIT", ctx)
+            )
 
         try:
             await ctx.guild.create_custom_emoji(
-                name=name
-                or (image.name if isinstance(image, PartialEmoji) else image.filename),
-                image=(
-                    await image.read()
-                    if isinstance(image, PartialEmoji)
-                    else image.buffer
-                ),
+                name=name or (image.name if isinstance(image, PartialEmoji) else image.filename),
+                image=(await image.read() if isinstance(image, PartialEmoji) else image.buffer),
                 reason=f"Created by {ctx.author} ({ctx.author.id})",
             )
         except RateLimited as exc:
             retry_after = timedelta(seconds=exc.retry_after)
             return await ctx.warn(
-                f"The server is currently ratelimited, try again in **{precisedelta(retry_after)}**!"
+                await ctx.bot.get_text(
+                    "moderation.emoji.add.RATELIMITED",
+                    ctx,
+                    retry_after=precisedelta(retry_after)
+                )
             )
-
         except HTTPException as exc:
-            return await ctx.warn("Failed to create the emoji!", codeblock(exc.text))
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.emoji.add.FAILED", ctx),
+                codeblock(exc.text)
+            )
 
         return await ctx.check()
 
@@ -3950,7 +4082,9 @@ class Moderation(Cog):
             return await ctx.send_help(ctx.command)
 
         elif not message.reactions:
-            return await ctx.warn("That message doesn't have any reactions!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.emoji.add.reactions.NO_REACTIONS", ctx)
+            )
 
         added_emojis: List[Emoji] = []
         async with ctx.typing():
@@ -3970,8 +4104,12 @@ class Moderation(Cog):
                     )
                 except RateLimited as exc:
                     return await ctx.warn(
-                        f"Ratelimited after {plural(added_emojis, md='`'):emoji}!",
-                        f"Please wait **{format_timespan(int(exc.retry_after))}** before trying again",
+                        await ctx.bot.get_text(
+                            "moderation.emoji.add.reactions.RATELIMITED",
+                            ctx,
+                            count=len(added_emojis),
+                            retry_after=format_timespan(int(exc.retry_after))
+                        ),
                         patch=ctx.response,
                     )
 
@@ -3981,7 +4119,7 @@ class Moderation(Cog):
                         > ctx.guild.emoji_limit
                     ):
                         return await ctx.warn(
-                            "The maximum amount of emojis has been reached!",
+                            await ctx.bot.get_text("moderation.emoji.add.reactions.EMOJI_LIMIT", ctx),
                             patch=ctx.response,
                         )
 
@@ -3989,12 +4127,17 @@ class Moderation(Cog):
 
                 added_emojis.append(emoji)
 
+        failed_text = (
+            f" (`{len(message.reactions) - len(added_emojis)}` failed)"
+            if len(added_emojis) < len(message.reactions)
+            else ""
+        )
         return await ctx.approve(
-            f"Added {plural(added_emojis, md='`'):emoji} to the server"
-            + (
-                f" (`{len(message.reactions) - len(added_emojis)}` failed)"
-                if len(added_emojis) < len(message.reactions)
-                else ""
+            await ctx.bot.get_text(
+                "moderation.emoji.add.reactions.SUCCESS",
+                ctx,
+                count=len(added_emojis),
+                failed=failed_text
             )
         )
 
@@ -4358,12 +4501,14 @@ class Moderation(Cog):
 
         if len(ctx.guild.stickers) == ctx.guild.sticker_limit:
             return await ctx.warn(
-                "The server is at the **maximum** amount of stickers!"
+                await ctx.bot.get_text("moderation.sticker.add.STICKER_LIMIT", ctx)
             )
 
         sticker = await sticker.fetch()
         if not isinstance(sticker, GuildSticker):
-            return await ctx.warn("Stickers cannot be default stickers!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.DEFAULT_ERROR", ctx)
+            )
 
         try:
             await ctx.guild.create_sticker(
@@ -4376,11 +4521,17 @@ class Moderation(Cog):
         except RateLimited as exc:
             retry_after = timedelta(seconds=exc.retry_after)
             return await ctx.warn(
-                f"The server is currently ratelimited, try again in **{precisedelta(retry_after)}**!"
+                await ctx.bot.get_text(
+                    "moderation.sticker.add.RATELIMITED",
+                    ctx,
+                    retry_after=precisedelta(retry_after)
+                )
             )
-
         except HTTPException as exc:
-            return await ctx.warn("Failed to create the sticker!", codeblock(exc.text))
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.add.FAILED", ctx),
+                codeblock(exc.text)
+            )
 
         return await ctx.check()
 
@@ -4447,9 +4598,13 @@ class Moderation(Cog):
                             if result['success']:
                                 updated_stickers += 1
                             elif result['error'] == 'ratelimit':
-                                await initial_message.edit(content=
-                                    f"Rate limited after updating {updated_stickers} stickers. "
-                                    f"Please wait {format_timespan(int(result['retry_after']))}..."
+                                await initial_message.edit(
+                                    content=await ctx.bot.get_text(
+                                        "moderation.sticker.tag.RATELIMITED",
+                                        ctx,
+                                        count=updated_stickers,
+                                        retry_after=format_timespan(int(result['retry_after']))
+                                    )
                                 )
                                 await asyncio.sleep(result['retry_after'])
                                 stickers_to_update.extend(batch[results.index(result):])
@@ -4460,7 +4615,12 @@ class Moderation(Cog):
 
                         if i % (batch_size * 2) == 0:
                             await initial_message.edit(
-                                content=f"Updated {updated_stickers}/{len(stickers_to_update)} stickers..."
+                                content=await ctx.bot.get_text(
+                                    "moderation.sticker.tag.PROGRESS",
+                                    ctx,
+                                    current=updated_stickers,
+                                    total=len(stickers_to_update)
+                                )
                             )
                         
                         await asyncio.sleep(0.5)
@@ -4475,13 +4635,22 @@ class Moderation(Cog):
 
                 if failed_stickers:
                     return await ctx.warn(
-                        f"Failed to update {len(failed_stickers)} stickers!\n"
-                        f"Successfully updated: {updated_stickers}/{len(stickers_to_update)}",
+                        await ctx.bot.get_text(
+                            "moderation.sticker.tag.FAILED",
+                            ctx,
+                            failed=len(failed_stickers),
+                            success=updated_stickers,
+                            total=len(stickers_to_update)
+                        ),
                         patch=initial_message
                     )
 
                 return await ctx.approve(
-                    f"Successfully updated {plural(updated_stickers, md='`'):sticker}",
+                    await ctx.bot.get_text(
+                        "moderation.sticker.tag.SUCCESS",
+                        ctx,
+                        count=updated_stickers
+                    ),
                     patch=initial_message
                 )
 
@@ -4490,67 +4659,67 @@ class Moderation(Cog):
                 span.set_status(trace.Status(trace.StatusCode.ERROR))
                 raise
 
-    @sticker.command(
-        name="steal",
-        aliases=["grab"],
-        example="new sticker"
-    )
-    @has_permissions(manage_expressions=True)
-    async def sticker_steal(
-        self,
-        ctx: Context,
-        name: Optional[Range[str, 2, 32]] = None,
-    ) -> Optional[Message]:
-        """
-        Steal a sticker from a message.
-        """
+    # @sticker.command(
+    #     name="steal",
+    #     aliases=["grab"],
+    #     example="new sticker"
+    # )
+    # @has_permissions(manage_expressions=True)
+    # async def sticker_steal(
+    #     self,
+    #     ctx: Context,
+    #     name: Optional[Range[str, 2, 32]] = None,
+    # ) -> Optional[Message]:
+    #     """
+    #     Steal a sticker from a message.
+    #     """
 
-        message: Optional[Message] = ctx.replied_message
-        if not message:
-            async for _message in ctx.channel.history(limit=25, before=ctx.message):
-                if _message.stickers:
-                    message = _message
-                    break
+    #     message: Optional[Message] = ctx.replied_message
+    #     if not message:
+    #         async for _message in ctx.channel.history(limit=25, before=ctx.message):
+    #             if _message.stickers:
+    #                 message = _message
+    #                 break
 
-        if not message:
-            return await ctx.warn(
-                "I couldn't find a message with a sticker in the past 25 messages!"
-            )
+    #     if not message:
+    #         return await ctx.warn(
+    #             "I couldn't find a message with a sticker in the past 25 messages!"
+    #         )
 
-        if not message.stickers:
-            return await ctx.warn("That message doesn't have any stickers!")
+    #     if not message.stickers:
+    #         return await ctx.warn("That message doesn't have any stickers!")
 
-        if len(ctx.guild.stickers) == ctx.guild.sticker_limit:
-            return await ctx.warn(
-                "The server is at the **maximum** amount of stickers!"
-            )
+    #     if len(ctx.guild.stickers) == ctx.guild.sticker_limit:
+    #         return await ctx.warn(
+    #             "The server is at the **maximum** amount of stickers!"
+    #         )
 
-        sticker = await message.stickers[0].fetch()
+    #     sticker = await message.stickers[0].fetch()
 
-        if not isinstance(sticker, GuildSticker):
-            return await ctx.warn("Stickers cannot be default stickers!")
+    #     if not isinstance(sticker, GuildSticker):
+    #         return await ctx.warn("Stickers cannot be default stickers!")
 
-        if sticker.guild_id == ctx.guild.id:
-            return await ctx.warn("That sticker is already in this server!")
+    #     if sticker.guild_id == ctx.guild.id:
+    #         return await ctx.warn("That sticker is already in this server!")
 
-        try:
-            await ctx.guild.create_sticker(
-                name=name or sticker.name,
-                description=sticker.description,
-                emoji=sticker.emoji,
-                file=File(BytesIO(await sticker.read())),
-                reason=f"Created by {ctx.author} ({ctx.author.id})",
-            )
-        except RateLimited as exc:
-            retry_after = timedelta(seconds=exc.retry_after)
-            return await ctx.warn(
-                f"The server is currently ratelimited, try again in **{precisedelta(retry_after)}**!"
-            )
+    #     try:
+    #         await ctx.guild.create_sticker(
+    #             name=name or sticker.name,
+    #             description=sticker.description,
+    #             emoji=sticker.emoji,
+    #             file=File(BytesIO(await sticker.read())),
+    #             reason=f"Created by {ctx.author} ({ctx.author.id})",
+    #         )
+    #     except RateLimited as exc:
+    #         retry_after = timedelta(seconds=exc.retry_after)
+    #         return await ctx.warn(
+    #             f"The server is currently ratelimited, try again in **{precisedelta(retry_after)}**!"
+    #         )
 
-        except HTTPException as exc:
-            return await ctx.warn("Failed to create the sticker!", codeblock(exc.text))
+    #     except HTTPException as exc:
+    #         return await ctx.warn("Failed to create the sticker!", codeblock(exc.text))
 
-        return await ctx.check()
+    #     return await ctx.check()
 
     @sticker.command(
         name="rename",
@@ -4569,27 +4738,30 @@ class Moderation(Cog):
         """
 
         sticker = None
-        
         if ctx.message.stickers:
             sticker = ctx.message.stickers[0]
-        
         elif ctx.replied_message and ctx.replied_message.stickers:
             sticker = ctx.replied_message.stickers[0]
 
         if not sticker:
-            return await ctx.send_help(ctx.command)
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.rename.NO_STICKER", ctx)
+            )
 
         sticker = await sticker.fetch()
-
         if not isinstance(sticker, GuildSticker):
-            return await ctx.warn("Stickers cannot be default stickers!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.DEFAULT_ERROR", ctx)
+            )
 
         if sticker.guild_id != ctx.guild.id:
-            return await ctx.warn("That sticker is not in this server!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.NOT_IN_SERVER", ctx)
+            )
 
         elif len(name) < 2:
             return await ctx.warn(
-                "The sticker name must be at least **2 characters** long!"
+                await ctx.bot.get_text("moderation.sticker.rename.NAME_TOO_SHORT", ctx)
             )
 
         name = name[:32]
@@ -4598,7 +4770,13 @@ class Moderation(Cog):
             reason=f"Updated by {ctx.author} ({ctx.author.id})",
         )
 
-        return await ctx.approve(f"Renamed the sticker to **{name}**")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.sticker.rename.SUCCESS",
+                ctx,
+                name=name
+            )
+        )
 
     @sticker.command(
         name="delete",
@@ -4614,17 +4792,92 @@ class Moderation(Cog):
         """
 
         if not (sticker := ctx.message.stickers[0]):
-            return await ctx.send_help(ctx.command)
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.delete.NO_STICKER", ctx)
+            )
 
         sticker = await sticker.fetch()
-
         if not isinstance(sticker, GuildSticker):
-            return await ctx.warn("Stickers cannot be default stickers!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.delete.DEFAULT_ERROR", ctx)
+            )
 
         if sticker.guild_id != ctx.guild.id:
-            return await ctx.warn("That sticker is not in this server!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.delete.NOT_IN_SERVER", ctx)
+            )
 
         await sticker.delete(reason=f"Deleted by {ctx.author} ({ctx.author.id})")
+        return await ctx.check()
+
+    @sticker.command(
+        name="steal",
+        aliases=["grab"],
+        example="new sticker"
+    )
+    @has_permissions(manage_expressions=True)
+    async def sticker_steal(
+        self,
+        ctx: Context,
+        name: Optional[Range[str, 2, 32]] = None,
+    ) -> Optional[Message]:
+        """Steal a sticker from a message."""
+        message: Optional[Message] = ctx.replied_message
+        if not message:
+            async for _message in ctx.channel.history(limit=25, before=ctx.message):
+                if _message.stickers:
+                    message = _message
+                    break
+
+        if not message:
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.steal.NO_MESSAGE", ctx)
+            )
+
+        if not message.stickers:
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.steal.NO_STICKERS", ctx)
+            )
+
+        if len(ctx.guild.stickers) == ctx.guild.sticker_limit:
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.steal.STICKER_LIMIT", ctx)
+            )
+
+        sticker = await message.stickers[0].fetch()
+        if not isinstance(sticker, GuildSticker):
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.steal.DEFAULT_ERROR", ctx)
+            )
+
+        if sticker.guild_id == ctx.guild.id:
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.steal.ALREADY_EXISTS", ctx)
+            )
+
+        try:
+            await ctx.guild.create_sticker(
+                name=name or sticker.name,
+                description=sticker.description,
+                emoji=sticker.emoji,
+                file=File(BytesIO(await sticker.read())),
+                reason=f"Created by {ctx.author} ({ctx.author.id})",
+            )
+        except RateLimited as exc:
+            retry_after = timedelta(seconds=exc.retry_after)
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.sticker.steal.RATELIMITED",
+                    ctx,
+                    retry_after=precisedelta(retry_after)
+                )
+            )
+        except HTTPException as exc:
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.sticker.steal.FAILED", ctx),
+                codeblock(exc.text)
+            )
+
         return await ctx.check()
 
     @sticker.command(
@@ -4640,10 +4893,12 @@ class Moderation(Cog):
 
         if ctx.guild.premium_tier < 2:
             return await ctx.warn(
-                "The server must have at least Level 2 to use this command!"
+                await ctx.bot.get_text("moderation.sticker.archive.PREMIUM_REQUIRED", ctx)
             )
 
-        await ctx.neutral("Starting the archival process...")
+        await ctx.neutral(
+            await ctx.bot.get_text("moderation.sticker.archive.STARTING", ctx)
+        )
 
         async with ctx.typing():
             buffer = BytesIO()
@@ -4704,7 +4959,9 @@ class Moderation(Cog):
                 reason=f"{ctx.author} ({ctx.author.id})",
             )
         except HTTPException:
-            return await ctx.warn("Failed to change the server's name!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.guild_set.name.FAILED", ctx)
+            )
 
         return await ctx.check()
 
@@ -4729,7 +4986,9 @@ class Moderation(Cog):
         """
 
         if not attachment.is_image():
-            return await ctx.warn("The attachment must be an image!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.guild_set.icon.NOT_IMAGE", ctx)
+            )
 
         await ctx.guild.edit(
             icon=attachment.buffer,
@@ -4755,7 +5014,9 @@ class Moderation(Cog):
         """
 
         if not attachment.is_image():
-            return await ctx.warn("The attachment must be an image!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.guild_set.splash.NOT_IMAGE", ctx)
+            )
 
         await ctx.guild.edit(
             splash=attachment.buffer,
@@ -4782,7 +5043,9 @@ class Moderation(Cog):
         """
 
         if not attachment.is_image():
-            return await ctx.warn("The attachment must be an image!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.guild_set.banner.NOT_IMAGE", ctx)
+            )
 
         await ctx.guild.edit(
             banner=attachment.buffer,
@@ -4820,10 +5083,7 @@ class Moderation(Cog):
     )
     @has_permissions(manage_guild=True)
     async def guild_set_system_welcome(self, ctx: Context) -> Message:
-        """
-        Toggle integrated welcome messages.
-        """
-
+        """Toggle integrated welcome messages."""
         flags = ctx.guild.system_channel_flags
         flags.join_notifications = not flags.join_notifications
 
@@ -4832,19 +5092,17 @@ class Moderation(Cog):
             reason=f"{ctx.author} ({ctx.author.id})",
         )
         return await ctx.approve(
-            f"{'Now' if flags.join_notifications else 'No longer'} sending integrated **welcome messages**"
+            await ctx.bot.get_text(
+                "moderation.guild_set.system.welcome.SUCCESS",
+                ctx,
+                status="Now" if flags.join_notifications else "No longer"
+            )
         )
 
-    @guild_set_system_welcome.command(
-        name="sticker",
-        aliases=["stickers", "wave"],
-    )
+    @guild_set_system_welcome.command(name="sticker", aliases=["stickers", "wave"])
     @has_permissions(manage_guild=True)
     async def guild_set_system_welcome_sticker(self, ctx: Context) -> Message:
-        """
-        Toggle replying with a welcome sticker.
-        """
-
+        """Toggle replying with a welcome sticker."""
         flags = ctx.guild.system_channel_flags
         flags.join_notification_replies = not flags.join_notification_replies
 
@@ -4853,19 +5111,17 @@ class Moderation(Cog):
             reason=f"{ctx.author} ({ctx.author.id})",
         )
         return await ctx.approve(
-            f"{'Now' if flags.join_notification_replies else 'No longer'} adding a **welcome sticker**"
+            await ctx.bot.get_text(
+                "moderation.guild_set.system.welcome.sticker.SUCCESS",
+                ctx,
+                status="Now" if flags.join_notification_replies else "No longer"
+            )
         )
 
-    @guild_set_system.command(
-        name="boost",
-        aliases=["boosts"],
-    )
+    @guild_set_system.command(name="boost", aliases=["boosts"])
     @has_permissions(manage_guild=True)
     async def guild_set_system_boost(self, ctx: Context) -> Message:
-        """
-        Toggle integrated boost messages.
-        """
-
+        """Toggle integrated boost messages."""
         flags = ctx.guild.system_channel_flags
         flags.premium_subscriptions = not flags.premium_subscriptions
 
@@ -4874,7 +5130,11 @@ class Moderation(Cog):
             reason=f"{ctx.author} ({ctx.author.id})",
         )
         return await ctx.approve(
-            f"{'Now' if flags.premium_subscriptions else 'No longer'} sending integrated **boost messages**"
+            await ctx.bot.get_text(
+                "moderation.guild_set.system.boost.SUCCESS",
+                ctx,
+                status="Now" if flags.premium_subscriptions else "No longer"
+            )
         )
 
     @guild_set.command(
@@ -4905,18 +5165,16 @@ class Moderation(Cog):
     @command()
     @has_permissions(manage_channels=True)
     async def nuke(self, ctx: Context) -> Message:
-        """
-        Clone the current channel.
-        This action is irreversable and will delete the channel.
-        """
-
+        """Clone the current channel."""
         channel = ctx.channel
         if not isinstance(channel, TextChannel):
-            return await ctx.warn("You can only nuke text channels!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.nuke.TEXT_ONLY", ctx)
+            )
 
         await ctx.prompt(
-            "Are you sure you want to **nuke** this channel?",
-            "This action is **irreversable** and will delete the channel!",
+            await ctx.bot.get_text("moderation.nuke.CONFIRM.TITLE", ctx),
+            await ctx.bot.get_text("moderation.nuke.CONFIRM.DESCRIPTION", ctx),
         )
 
         new_channel = await channel.clone(
@@ -4931,12 +5189,16 @@ class Moderation(Cog):
         )
 
         embed = Embed(
-            title="Channel Nuked",
-            description=f"This channel has been nuked by {ctx.author.mention}",
+            title=await ctx.bot.get_text("moderation.nuke.SUCCESS.TITLE", ctx),
+            description=await ctx.bot.get_text(
+                "moderation.nuke.SUCCESS.DESCRIPTION",
+                ctx,
+                author=ctx.author.mention
+            ),
         )
         if reconfigured:
             embed.add_field(
-                name="**Reconfigured Settings**",
+                name=await ctx.bot.get_text("moderation.nuke.SUCCESS.RECONFIGURED", ctx),
                 value="" + "\n".join(reconfigured),
             )
 
@@ -4945,15 +5207,8 @@ class Moderation(Cog):
 
     @command(example="3423346")
     @has_permissions(manage_messages=True)
-    async def pin(
-        self,
-        ctx: Context,
-        message: Optional[Message],
-    ) -> Optional[Message]:
-        """
-        Pin a specific message.
-        """
-
+    async def pin(self, ctx: Context, message: Optional[Message]) -> Optional[Message]:
+        """Pin a specific message."""
         message = message or ctx.replied_message
         if not message:
             async for message in ctx.channel.history(limit=1, before=ctx.message):
@@ -4963,14 +5218,21 @@ class Moderation(Cog):
             return await ctx.send_help(ctx.command)
 
         elif message.guild != ctx.guild:
-            return await ctx.warn("The message must be in this server!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.pin.WRONG_GUILD", ctx)
+            )
 
         elif message.pinned:
             return await ctx.warn(
-                f"That [`message`]({message.jump_url}) is already pinned!"
+                await ctx.bot.get_text(
+                    "moderation.pin.ALREADY_PINNED",
+                    ctx,
+                    url=message.jump_url
+                )
             )
 
         await message.pin(reason=f"{ctx.author} ({ctx.author.id})")
+        return await ctx.check()
 
     @command(example="232133425")
     @has_permissions(manage_messages=True)
@@ -5069,7 +5331,12 @@ class Moderation(Cog):
                 initial_message = None
                 if len(user.roles) > 10:
                     initial_message = await ctx.neutral(
-                        f"Processing jail for {user.mention} ({len(user.roles)} roles)..."
+                        await ctx.bot.get_text(
+                            "moderation.jail.PROCESSING",
+                            ctx,
+                            user=user.mention,
+                            role_count=len(user.roles)
+                        )
                     )
 
                 check_task = self.bot.db.fetchrow(
@@ -5113,7 +5380,13 @@ class Moderation(Cog):
                 if check:
                     if initial_message:
                         await initial_message.delete()
-                    return await ctx.warn(f"**{user.mention}** is already jailed!")
+                    return await ctx.warn(
+                        await ctx.bot.get_text(
+                            "moderation.jail.ALREADY_JAILED",
+                            ctx,
+                            user=user.mention
+                        )
+                    )
 
                 sql_as_text = json.dumps(roles_to_store)
                 
@@ -5134,11 +5407,15 @@ class Moderation(Cog):
 
                 jail_role = ctx.guild.get_role(mod_config["role_id"])
                 if not jail_role:
-                    raise ValueError("Jail role not found!")
+                    raise ValueError(
+                        await ctx.bot.get_text("moderation.jail.ROLE_NOT_FOUND", ctx)
+                    )
 
                 try:
                     if len(user.roles) > 10:
-                        await initial_message.edit(content="Removing roles...")
+                        await initial_message.edit(
+                            content=await ctx.bot.get_text("moderation.jail.REMOVING_ROLES", ctx)
+                        )
                         
                     new_roles = [r for r in user.roles if not r.is_assignable()]
                     new_roles.append(jail_role)
@@ -5166,9 +5443,11 @@ class Moderation(Cog):
                     if jail_channel:
                         notification_tasks.append(
                             jail_channel.send(
-                                f"{user.mention}, you have been jailed! "
-                                "Wait for a staff member to unjail you and check "
-                                "direct messages if you have received one!"
+                                await ctx.bot.get_text(
+                                    "moderation.jail.NOTIFICATION",
+                                    ctx,
+                                    user=user.mention
+                                )
                             )
                         )
 
@@ -5181,7 +5460,12 @@ class Moderation(Cog):
 
                     span.set_attribute("success", True)
                     return await ctx.approve(
-                        f"**{user}** got jailed - {reason}",
+                        await ctx.bot.get_text(
+                            "moderation.jail.SUCCESS",
+                            ctx,
+                            user=user,
+                            reason=reason
+                        ),
                         patch=initial_message if initial_message else None
                     )
 
@@ -5189,7 +5473,12 @@ class Moderation(Cog):
                     span.record_exception(e)
                     span.set_attribute("success", False)
                     return await ctx.warn(
-                        f"There was a problem jailing **{user.mention}**: {str(e)}",
+                        await ctx.bot.get_text(
+                            "moderation.jail.FAILED",
+                            ctx,
+                            user=user.mention,
+                            error=str(e)
+                        ),
                         patch=initial_message if initial_message else None
                     )
 
@@ -5345,27 +5634,7 @@ class Moderation(Cog):
     @hybrid_command()
     @has_permissions(manage_guild=True, manage_channels=True, manage_roles=True, view_channel=True)
     async def setme(self, ctx: Context):
-        """
-        Enable the jail system in your server.
-        Requires the bot to have Manage Roles and Manage Channels permissions.
-        """
-        if not (ctx.guild.me.guild_permissions.manage_roles and 
-                ctx.guild.me.guild_permissions.manage_channels):
-            return await ctx.warn("I need **Manage Roles** and **Manage Channels** permissions!")
-        
-        check = await self.bot.db.fetchrow(
-            """
-            SELECT * FROM mod 
-            WHERE guild_id = $1
-            """,
-            ctx.guild.id,
-        )
-
-        if check:
-            return await ctx.warn("The jail system is **already** enabled in this server!")
-
-        await ctx.typing()
-
+        """Enable the jail system in your server."""
         try:
             try:
                 category = await ctx.guild.create_category(name="evict mod")
@@ -5395,9 +5664,13 @@ class Moderation(Cog):
                     category=category
                 )
             except discord.Forbidden:
-                return await ctx.warn("I don't have permission to create channels!")
+                return await ctx.warn(
+                    await ctx.bot.get_text("moderation.setme.NO_PERMISSIONS", ctx)
+                )
             except discord.HTTPException as e:
-                return await ctx.warn(f"Failed to create channels: {str(e)}")
+                return await ctx.warn(
+                    await ctx.bot.get_text("moderation.setme.FAILED_CREATE", ctx, error=str(e))
+                )
 
             await self.bot.db.execute(
                 """
@@ -5411,35 +5684,35 @@ class Moderation(Cog):
             )
             await self.bot.db.execute("INSERT INTO cases VALUES ($1,$2)", ctx.guild.id, 0)
             
-            return await ctx.approve("I have **enabled** the jail system!")
+            return await ctx.approve(
+                await ctx.bot.get_text("moderation.setme.SUCCESS", ctx)
+            )
             
         except Exception as e:
-            return await ctx.warn(f"An error occurred: {str(e)}")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.setme.ERROR", ctx, error=str(e))
+            )
 
     @Mod.is_mod_configured()
     @hybrid_command()
     @has_permissions(manage_guild=True, manage_channels=True, manage_roles=True, view_channel=True)
     async def unsetme(self, ctx: Context):
-        """
-        Disable the jail system in your server.
-        """
-
+        """Disable the jail system in your server."""
         check = await self.bot.db.fetchrow(
-            """
-            SELECT * FROM mod 
-            WHERE guild_id = $1
-            """,
+            "SELECT * FROM mod WHERE guild_id = $1",
             ctx.guild.id,
         )
 
         if not check:
-            return await ctx.warn("The jail system is **not** enabled in this server!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.unsetme.NOT_ENABLED", ctx)
+            )
 
         view = ClearMod(ctx)
         view.message = await ctx.send(
             view=view,
             embed=Embed(
-                description=f"> Are you sure you want to disable jail?",
+                description=await ctx.bot.get_text("moderation.unsetme.CONFIRM", ctx)
             ),
         )
 
@@ -5468,21 +5741,18 @@ class Moderation(Cog):
 
         permissions_list = [perm.strip().lower() for perm in permissions.split(",")]
 
-        # invalid_permissions = [perm for perm in permissions_list if perm not in map(str.lower, fake_permissions)]
-        # if invalid_permissions:
-        #     invalid_permissions_str = "\n".join(f"• `{perm}`" for perm in invalid_permissions)
-        #     return await ctx.warn(f"Invalid permissions. Valid permissions are:\n{invalid_permissions_str}")
-
         invalid_permissions = [
             perm
             for perm in permissions_list
             if perm not in map(str.lower, fake_permissions)
         ]
         if invalid_permissions:
-            # invalid_permissions_str = "\n".join(f"• `{perm}`" for perm in invalid_permissions)
-            # valid_permissions_str = "\n".join(f"`{perm}`" for perm in fake_permissions)
             return await ctx.warn(
-                f"Invalid permissions. Run ``{ctx.clean_prefix}fakepermissions permissions`` to view the list of valid permisions."
+                await ctx.bot.get_text(
+                    "moderation.fakepermissions.grant.INVALID_PERMISSIONS",
+                    ctx,
+                    prefix=ctx.clean_prefix
+                )
             )
 
         check = await self.bot.db.fetchrow(
@@ -5501,11 +5771,15 @@ class Moderation(Cog):
             if already_has:
                 already_has_str = ", ".join(f"`{perm}`" for perm in already_has)
                 return await ctx.warn(
-                    f"{role.mention} already has the fake permissions: {already_has_str}!"
+                    await ctx.bot.get_text(
+                        "moderation.fakepermissions.grant.ALREADY_HAS",
+                        ctx,
+                        role=role.mention,
+                        permissions=already_has_str
+                    )
                 )
 
             perms.extend(permissions_list)
-
             await self.bot.db.execute(
                 f"""
                 UPDATE {FAKE_PERMISSIONS_TABLE} 
@@ -5531,7 +5805,12 @@ class Moderation(Cog):
 
         added_permissions_str = ", ".join(f"`{perm}`" for perm in permissions_list)
         return await ctx.approve(
-            f"Added {added_permissions_str} to the {role.mention}'s fake permissions!"
+            await ctx.bot.get_text(
+                "moderation.fakepermissions.grant.SUCCESS",
+                ctx,
+                permissions=added_permissions_str,
+                role=role.mention
+            )
         )
 
     @has_permissions(guild_owner=True)
@@ -5557,11 +5836,13 @@ class Moderation(Cog):
             if perm not in map(str.lower, fake_permissions)
         ]
         if invalid_permissions:
-            invalid_permissions_str = "\n".join(
-                f"• `{perm}`" for perm in invalid_permissions
-            )
+            invalid_permissions_str = "\n".join(f"• `{perm}`" for perm in invalid_permissions)
             return await ctx.warn(
-                f"Invalid permissions. Valid permissions are:\n{invalid_permissions_str}"
+                await ctx.bot.get_text(
+                    "moderation.fakepermissions.revoke.INVALID_PERMISSIONS",
+                    ctx,
+                    permissions=invalid_permissions_str
+                )
             )
 
         check = await self.bot.db.fetchrow(
@@ -5569,18 +5850,22 @@ class Moderation(Cog):
             SELECT permission 
             FROM {FAKE_PERMISSIONS_TABLE} 
             WHERE guild_id = $1 
-            AND role_id = $2""",
+            AND role_id = $2
+            """,
             ctx.guild.id,
             role.id,
         )
 
         if not check:
             return await ctx.warn(
-                f"There are no fake permissions associated with {role.mention}!"
+                await ctx.bot.get_text(
+                    "moderation.fakepermissions.revoke.NO_PERMISSIONS",
+                    ctx,
+                    role=role.mention
+                )
             )
 
         perms = json.loads(check[0])
-
         removed_permissions = []
         for permission in permissions_list:
             if permission in perms:
@@ -5589,7 +5874,11 @@ class Moderation(Cog):
 
         if not removed_permissions:
             return await ctx.warn(
-                f"{role.mention} does not have any of the specified fake permissions!"
+                await ctx.bot.get_text(
+                    "moderation.fakepermissions.revoke.NOT_FOUND",
+                    ctx,
+                    role=role.mention
+                )
             )
 
         if perms:
@@ -5598,39 +5887,43 @@ class Moderation(Cog):
                 UPDATE {FAKE_PERMISSIONS_TABLE} 
                 SET permission = $1 
                 WHERE guild_id = $2 
-                AND role_id = $3""",
+                AND role_id = $3
+                """,
                 json.dumps(perms),
                 ctx.guild.id,
                 role.id,
             )
         else:
             await self.bot.db.execute(
-                f"DELETE FROM {FAKE_PERMISSIONS_TABLE} WHERE guild_id = $1 AND role_id = $2",
+                f"""
+                DELETE FROM {FAKE_PERMISSIONS_TABLE} 
+                WHERE guild_id = $1 
+                AND role_id = $2
+                """,
                 ctx.guild.id,
                 role.id,
             )
 
         removed_permissions_str = ", ".join(f"`{perm}`" for perm in removed_permissions)
         return await ctx.approve(
-            f"Removed {removed_permissions_str} from the {role.mention}'s fake permissions!"
+            await ctx.bot.get_text(
+                "moderation.fakepermissions.revoke.SUCCESS",
+                ctx,
+                permissions=removed_permissions_str,
+                role=role.mention
+            )
         )
 
-    @fakepermissions.command(
-        name="list",
-        aliases=["ls"],
-    )
+    @fakepermissions.command(name="list", aliases=["ls"])
     @has_permissions(guild_owner=True)
     async def fakepermission_list(self, ctx: Context) -> Message:
-        """
-        View all fake permissions for the server.
-        """
-
+        """View all fake permissions for the server."""
         records = await self.bot.db.fetch(
             """
-                SELECT role_id, permission
-                FROM fake_permissions
-                WHERE guild_id = $1
-                """,
+            SELECT role_id, permission
+            FROM fake_permissions
+            WHERE guild_id = $1
+            """,
             ctx.guild.id,
         )
 
@@ -5640,15 +5933,26 @@ class Moderation(Cog):
             if role:
                 permissions = json.loads(record["permission"])
                 for perm in permissions:
-                    fake_permissions.append(f"{role.mention} (`{perm}`)")
+                    fake_permissions.append(
+                        await ctx.bot.get_text(
+                            "moderation.fakepermissions.list.ENTRY",
+                            ctx,
+                            role=role.mention,
+                            permission=perm
+                        )
+                    )
 
         if not fake_permissions:
-            return await ctx.warn("No fake permissions exist for this server!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.fakepermissions.list.NONE_EXIST", ctx)
+            )
 
         paginator = Paginator(
             ctx,
             entries=fake_permissions,
-            embed=Embed(title="Fake Permissions"),
+            embed=Embed(
+                title=await ctx.bot.get_text("moderation.fakepermissions.list.TITLE", ctx)
+            ),
         )
 
         return await paginator.start()
@@ -5685,29 +5989,53 @@ class Moderation(Cog):
 
         if not cases:
             return await ctx.warn(
-                f"No moderation history found for {moderator.mention}"
+                await ctx.bot.get_text(
+                    "moderation.modhistory.NO_HISTORY",
+                    ctx,
+                    moderator=moderator.mention
+                )
             )
 
         entries = []
         for case in cases:
             duration_str = (
-                f"\nDuration: {humanize.naturaldelta(case['duration'])}"
+                await ctx.bot.get_text(
+                    "moderation.modhistory.DURATION",
+                    ctx,
+                    duration=humanize.naturaldelta(case['duration'])
+                )
                 if case["duration"]
                 else ""
             )
             timestamp = f"<t:{int(case['timestamp'].timestamp())}:f>"
 
             entries.append(
-                f"**Case #{case['case_id']}**\n"
-                f"Action: {case['action']}\n"
-                f"User: `{case['user_id']}`\n"
-                f"Date: {timestamp}\n"
-                f"Reason: {case['reason']}"
-                f"{duration_str}"
+                await ctx.bot.get_text(
+                    "moderation.modhistory.CASE_ENTRY",
+                    ctx,
+                    case_id=case['case_id'],
+                    action=case['action'],
+                    user_id=case['user_id'],
+                    timestamp=timestamp,
+                    reason=case['reason'],
+                    duration=duration_str
+                )
             )
 
-        embed = Embed(title=f"Mod history for {moderator}")
-        embed.set_footer(text=f"{len(cases)} total cases")
+        embed = Embed(
+            title=await ctx.bot.get_text(
+                "moderation.modhistory.TITLE",
+                ctx,
+                moderator=moderator
+            )
+        )
+        embed.set_footer(
+            text=await ctx.bot.get_text(
+                "moderation.modhistory.FOOTER",
+                ctx,
+                count=len(cases)
+            )
+        )
 
         paginator = Paginator(
             ctx,
@@ -5769,11 +6097,8 @@ class Moderation(Cog):
 
     @command(aliases=["pic", "pictureperms", "picture"], example="#general @x")
     @has_permissions(manage_roles=True)
-    async def picperms(
-        self, ctx: Context, channel: Optional[TextChannel], user: Member
-    ):
+    async def picperms(self, ctx: Context, channel: Optional[TextChannel], user: Member):
         """Toggle picture permissions for a user."""
-
         if channel is None:
             channel = ctx.channel
 
@@ -5786,13 +6111,22 @@ class Moderation(Cog):
         if pic_perms:
             await channel.set_permissions(user, attach_files=False, embed_links=False)
             await ctx.approve(
-                f"Revoked picture permissions from {user.mention} in {channel.mention}!"
+                await ctx.bot.get_text(
+                    "moderation.picperms.REVOKED",
+                    ctx,
+                    user=user.mention,
+                    channel=channel.mention
+                )
             )
-
         else:
             await channel.set_permissions(user, attach_files=True, embed_links=True)
             await ctx.approve(
-                f"Granted picture permissions to {user.mention} in {channel.mention}!"
+                await ctx.bot.get_text(
+                    "moderation.picperms.GRANTED",
+                    ctx,
+                    user=user.mention,
+                    channel=channel.mention
+                )
             )
 
     @group(name="warn", invoke_without_command=True, example="@x annoying")
@@ -5890,7 +6224,11 @@ class Moderation(Cog):
         
         if action not in valid_actions:
             return await ctx.warn(
-                f"Invalid action. Valid actions are: {', '.join(valid_actions)}"
+                await ctx.bot.get_text(
+                    "moderation.warn_action.add.INVALID_ACTION",
+                    ctx,
+                    actions=", ".join(valid_actions)
+                )
             )
         
         await self.bot.db.execute(
@@ -5904,9 +6242,15 @@ class Moderation(Cog):
             int(flags.duration.total_seconds()) if flags.duration else None
         )
 
+        duration_text = f"{humanize.naturaldelta(flags.duration)}" if flags.duration else ""
         return await ctx.approve(
-            f"Set warn threshold {flags.threshold} to {action}" +
-            (f" with duration {humanize.naturaldelta(flags.duration)}" if flags.duration else "")
+            await ctx.bot.get_text(
+                "moderation.warn_action.add.SUCCESS",
+                ctx,
+                threshold=flags.threshold,
+                action=action,
+                duration=duration_text
+            )
         )
 
     @warn_action.command(name="remove", example="3")
@@ -6001,22 +6345,14 @@ class Moderation(Cog):
 
         return await ctx.approve(f"Removed warning case #{case_id} from {user_text}")      
 
-    @group(
-        name="chunkban",
-        aliases=["cb"],
-        example="10",
-    )
+    @group(name="chunkban", aliases=["cb"], example="10")
     @has_permissions(ban_members=True)
-    async def chunkban(
-        self,
-        ctx: Context,
-        amount: Annotated[int, Range[int, 2, 100]] = 10,
-    ) -> Optional[Message]:
-        """
-        Ban a certain number of newest members from the server.
-        """
+    async def chunkban(self, ctx: Context, amount: Annotated[int, Range[int, 2, 100]] = 10) -> Optional[Message]:
+        """Ban a certain number of newest members from the server."""
         if await self.bot.redis.ratelimited(f"chunkban:{ctx.guild.id}", 1, 180):
-            return await ctx.warn("This command can only be used **once per three minutes**!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.chunkban.RATELIMIT", ctx)
+            )
 
         if not ctx.guild.chunked:
             await ctx.guild.chunk(cache=True)
@@ -6024,7 +6360,7 @@ class Moderation(Cog):
         config = await Settings.fetch(self.bot, ctx.guild)
         if not config.is_trusted(ctx.author):
             await ctx.warn(
-                "You must be a **trusted administrator** to use this command!"
+                await ctx.bot.get_text("moderation.chunkban.TRUST_REQUIRED", ctx)
             )
             return False
 
@@ -6037,10 +6373,16 @@ class Moderation(Cog):
         banned = members[:amount]
 
         if not banned:
-            return await ctx.warn("No members found to ban!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.chunkban.NO_MEMBERS", ctx)
+            )
 
         await ctx.prompt(
-            f"Are you sure you want to ban the newest {amount} members?",
+            await ctx.bot.get_text(
+                "moderation.chunkban.CONFIRM",
+                ctx,
+                amount=amount
+            )
         )
 
         banned_count = 0
@@ -6057,7 +6399,12 @@ class Moderation(Cog):
                     continue
 
         return await ctx.approve(
-            f"Banned {banned_count} out of {len(banned)} members."
+            await ctx.bot.get_text(
+                "moderation.chunkban.SUCCESS",
+                ctx,
+                banned=banned_count,
+                total=len(banned)
+            )
         )
 
     @chunkban.command(name="avatars", aliases=["defaultavatars"])
@@ -6067,7 +6414,9 @@ class Moderation(Cog):
         Ban members with default avatars.
         """
         if await self.bot.redis.ratelimited(f"chunkban:{ctx.guild.id}", 1, 180):
-            return await ctx.warn("This command can only be used **once per three minutes**!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.chunkban.RATELIMIT", ctx)
+            )
 
         if not ctx.guild.chunked:
             await ctx.guild.chunk(cache=True)
@@ -6075,17 +6424,19 @@ class Moderation(Cog):
         config = await Settings.fetch(self.bot, ctx.guild)
         if not config.is_trusted(ctx.author):
             await ctx.warn(
-                "You must be a **trusted administrator** to use this command!"
+                await ctx.bot.get_text("moderation.chunkban.TRUST_REQUIRED", ctx)
             )
             return False
 
         members = [member for member in ctx.guild.members if member.default_avatar]
 
         if not members:
-            return await ctx.warn("No members found with default avatars!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.chunkban.avatars.NO_MEMBERS", ctx)
+            )
 
         await ctx.prompt(
-            f"Are you sure you want to ban members with default avatars?",
+            await ctx.bot.get_text("moderation.chunkban.avatars.CONFIRM", ctx)
         )
 
         async with ctx.typing():
@@ -6097,7 +6448,11 @@ class Moderation(Cog):
                     continue
 
         return await ctx.approve(
-            f"Banned {plural(len(members), md='**')} members with default avatars."
+            await ctx.bot.get_text(
+                "moderation.chunkban.avatars.SUCCESS",
+                ctx,
+                count=plural(len(members), md='**')
+            )
         )
     
     @group(name="immune", invoke_without_command=True)
@@ -6117,9 +6472,7 @@ class Moderation(Cog):
     @immune_add.command(name="user", aliases=["member"])
     @has_permissions(manage_guild=True)
     async def immune_add_user(self, ctx: Context, member: Member):
-        """
-        Add user to immune list.
-        """
+        """Add user to immune list."""
         immune = await self.bot.db.fetchrow(
             """
             SELECT * FROM immune 
@@ -6132,7 +6485,13 @@ class Moderation(Cog):
         )
 
         if immune:
-            return await ctx.warn(f"**{member.name}** is **already** immune!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.immune.add.user.ALREADY_IMMUNE",
+                    ctx,
+                    name=member.name
+                )
+            )
         
         await self.bot.db.execute(
             """
@@ -6145,14 +6504,18 @@ class Moderation(Cog):
             member.id
         )
         
-        return await ctx.approve(f"Added **{member.name}** to immune list!")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.immune.add.user.SUCCESS",
+                ctx,
+                name=member.name
+            )
+        )
     
     @immune_add.command(name="role")
     @has_permissions(manage_guild=True)
     async def immune_add_role(self, ctx: Context, role: Role):
-        """
-        Add role to immune list.
-        """
+        """Add role to immune list."""
         immune = await self.bot.db.fetchrow(
             """
             SELECT * FROM immune 
@@ -6165,7 +6528,13 @@ class Moderation(Cog):
         )
 
         if immune:
-            return await ctx.warn(f"**{role.name}** is **already** immune!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.immune.add.role.ALREADY_IMMUNE",
+                    ctx,
+                    name=role.name
+                )
+            )
 
         await self.bot.db.execute(
             """
@@ -6178,7 +6547,13 @@ class Moderation(Cog):
             role.id
         )
         
-        return await ctx.approve(f"Added {role.mention} to immune list!")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.immune.add.role.SUCCESS",
+                ctx,
+                mention=role.mention
+            )
+        )
 
     @immune.group(name="remove", invoke_without_command=True)
     async def immune_remove(self, ctx: Context):
@@ -6190,9 +6565,7 @@ class Moderation(Cog):
     @immune_remove.command(name="user", aliases=["member"])
     @has_permissions(manage_guild=True)
     async def immune_remove_user(self, ctx: Context, member: Member):
-        """
-        Remove user from immune list.
-        """
+        """Remove user from immune list."""
         immune = await self.bot.db.fetchrow(
             """
             SELECT * FROM immune 
@@ -6205,7 +6578,13 @@ class Moderation(Cog):
         )
 
         if not immune:
-            return await ctx.warn(f"**{member.name}** is **not** immune!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.immune.remove.user.NOT_IMMUNE",
+                    ctx,
+                    name=member.name
+                )
+            )
 
         await self.bot.db.execute(
             """
@@ -6218,14 +6597,18 @@ class Moderation(Cog):
             member.id
         )
         
-        return await ctx.approve(f"Removed {member.mention} from immune list!")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.immune.remove.user.SUCCESS",
+                ctx,
+                mention=member.mention
+            )
+        )
     
     @immune_remove.command(name="role")
     @has_permissions(manage_guild=True)
     async def immune_remove_role(self, ctx: Context, role: Role):
-        """
-        Remove role from immune list.
-        """
+        """Remove role from immune list."""
         immune = await self.bot.db.fetchrow(
             """
             SELECT * FROM immune 
@@ -6238,7 +6621,13 @@ class Moderation(Cog):
         )
 
         if not immune:
-            return await ctx.warn(f"**{role.name}** is **not** immune!")
+            return await ctx.warn(
+                await ctx.bot.get_text(
+                    "moderation.immune.remove.role.NOT_IMMUNE",
+                    ctx,
+                    name=role.name
+                )
+            )
 
         await self.bot.db.execute(
             """
@@ -6251,14 +6640,18 @@ class Moderation(Cog):
             role.id
         )
         
-        return await ctx.approve(f"Removed {role.mention} from immune list!")
+        return await ctx.approve(
+            await ctx.bot.get_text(
+                "moderation.immune.remove.role.SUCCESS",
+                ctx,
+                mention=role.mention
+            )
+        )
     
     @immune.command(name="list")
     @has_permissions(manage_guild=True)
     async def immune_list(self, ctx: Context):
-        """
-        List all immune users and roles.
-        """
+        """List all immune users and roles."""
         immune = await self.bot.db.fetch(
             """
             SELECT entity_id, role_id, type 
@@ -6269,10 +6662,11 @@ class Moderation(Cog):
         )
         
         if not immune:
-            return await ctx.warn("No immune users or roles found!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.immune.list.NONE", ctx)
+            )
         
         entries = []
-
         for record in immune:
             entity_id = record['entity_id']
             role_id = record['role_id']
@@ -6284,12 +6678,16 @@ class Moderation(Cog):
                 entries.append(f"<@&{role_id}>")
         
         if not entries:
-            return await ctx.warn("No immune users or roles found!")
+            return await ctx.warn(
+                await ctx.bot.get_text("moderation.immune.list.NONE", ctx)
+            )
 
         paginator = Paginator(
             ctx,
             entries=entries,
-            embed=Embed(title="Immune Users and Roles")
+            embed=Embed(
+                title=await ctx.bot.get_text("moderation.immune.list.TITLE", ctx)
+            )
         )
         
         return await paginator.start()
