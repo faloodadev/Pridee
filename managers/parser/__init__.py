@@ -7,8 +7,7 @@ from discord.ui import Button, View
 from pydantic import BaseModel
 
 from core.context import Context
-from managers.parsers.variables import TARGET, parse
-
+from managers.parser.variables import TARGET, parse
 
 NODE = re.compile(r"\{(?P<name>.*?):\s*(?P<value>.*?)\}", re.DOTALL)
 IMAGE = re.compile(r"(?:http\:|https\:)?\/\/.*\.(?P<mime>png|jpg|jpeg|webp|gif)")
@@ -158,7 +157,10 @@ class Components:
 
 
 class Script:
-    __slots__ = ('template', 'fixed_template', 'targets', 'nodes', '_data_cache')
+    template: str
+    fixed_template: str
+    targets: List[TARGET | Tuple[TARGET, str]]
+    nodes: List[Node]
 
     def __init__(
         self,
@@ -169,7 +171,6 @@ class Script:
         self.nodes = []
         self.template = template
         self.targets = targets
-        self._data_cache = None
         self.compile()
 
     def __repr__(self) -> str:
@@ -184,7 +185,6 @@ class Script:
     def compile(self) -> None:
         self.fixed_template = parse(self.template, self.targets)
         self.nodes = self.parse_nodes(self.fixed_template)
-        self._data_cache = None  
 
     def parse_nodes(self, template: str) -> List[Node]:
         return [
@@ -210,9 +210,6 @@ class Script:
 
     @property
     def data(self) -> "ScriptData":
-        if self._data_cache is not None:
-            return self._data_cache
-
         self.compile()
         data: ScriptData = {
             "content": "",
@@ -229,7 +226,6 @@ class Script:
         ):
             data["content"] = self.fixed_template
 
-        self._data_cache = data
         return data
 
     async def send(

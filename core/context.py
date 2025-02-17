@@ -465,34 +465,32 @@ class Context(OriginalContext):
 
         Raises UserInputError if the user denies the prompt.
         """
-        key = xxh32_hexdigest(f"prompt:{self.author.id}:{self.command.qualified_name}")
-        async with self.bot.redis.get_lock(key):
-            embed = Embed(
-                description="\n".join(
-                    ("" if len(args) == 1 or index == len(args) - 1 else "") + str(arg)
-                    for index, arg in enumerate(args)
-                ),
-            )
-            view = Confirmation(self, timeout=timeout)
+        embed = Embed(
+            description="\n".join(
+                ("" if len(args) == 1 or index == len(args) - 1 else "") + str(arg)
+                for index, arg in enumerate(args)
+            ),
+        )
+        view = Confirmation(self, timeout=timeout)
 
-            try:
-                message = await self.send(embed=embed, view=view)
-            except HTTPException as exc:
-                raise UserInputError(
-                    await self.bot.get_text("system.confirm.FAILED_SEND_PROMPT", self)
-                ) from exc
-
-            await view.wait()
-            if delete_after:
-                await quietly_delete(message)
-
-            if view.value is True:
-                return True
-
+        try:
+            message = await self.send(embed=embed, view=view)
+        except HTTPException as exc:
             raise UserInputError(
-                await self.bot.get_text("system.confirm.PROMPT_NOT_APPROVED", self)
-            )
-        
+                await self.bot.get_text("system.confirm.FAILED_SEND_PROMPT", self)
+            ) from exc
+
+        await view.wait()
+        if delete_after:
+            await quietly_delete(message)
+
+        if view.value is True:
+            return True
+
+        raise UserInputError(
+            await self.bot.get_text("system.confirm.PROMPT_NOT_APPROVED", self)
+        )
+
     async def confirm(
         self,
         *args: str,
@@ -505,33 +503,31 @@ class Context(OriginalContext):
 
         Raises UserInputError if the user denies the prompt.
         """
-        key = xxh32_hexdigest(f"confirm:{self.author.id}:{self.command.qualified_name}")
-        async with self.bot.redis.get_lock(key):
-            embed = Embed(
-                    description="\n".join(
-                        ("" if len(args) == 1 or index == len(args) - 1 else "") + str(arg)
-                        for index, arg in enumerate(args)
-                    ),
-                )
-            view = Approve(self, user=user, timeout=timeout)
+        embed = Embed(
+            description="\n".join(
+                ("" if len(args) == 1 or index == len(args) - 1 else "") + str(arg)
+                for index, arg in enumerate(args)
+            ),
+        )
+        view = Approve(self, user=user, timeout=timeout)
 
-            try:
-                message = await self.send(embed=embed, view=view)
-            except HTTPException as exc:
-                    raise UserInputError(
-                        await self.bot.get_text("system.confirm.FAILED_SEND_PROMPT", self)
-                    ) from exc
-
-            await view.wait()
-            if delete_after:
-                await quietly_delete(message)
-
-            if view.value is True:
-                    return True
-
+        try:
+            message = await self.send(embed=embed, view=view)
+        except HTTPException as exc:
             raise UserInputError(
-                await self.bot.get_text("system.confirm.PROMPT_NOT_APPROVED", self)
-            )
+                await self.bot.get_text("system.confirm.FAILED_SEND_PROMPT", self)
+            ) from exc
+
+        await view.wait()
+        if delete_after:
+            await quietly_delete(message)
+
+        if view.value is True:
+            return True
+
+        raise UserInputError(
+            await self.bot.get_text("system.confirm.PROMPT_NOT_APPROVED", self)
+        )
 
     async def currency(self, text, **kwargs):
         """

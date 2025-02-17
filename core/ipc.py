@@ -8,6 +8,7 @@ from utils.logger import log
 from opentelemetry import trace
 from redis.asyncio import Redis
 import config
+import discord
 
 class ClusterIPC:
     def __init__(self, bot, cluster_id: int):
@@ -36,6 +37,10 @@ class ClusterIPC:
             log.info(f"Subscribed to cluster_{self.cluster_id}")
             
             await asyncio.sleep(0.1)
+            
+            self.add_handler("get_member_info", self.get_member_info)
+            self.add_handler("get_guild_info", self.get_guild_info)
+            self.add_handler("create_appeal_channels", self.create_appeal_channels)
             
             self.listener_task = asyncio.create_task(
                 self._listen(), 
@@ -271,3 +276,61 @@ class ClusterIPC:
                     "last_heartbeat": last_heartbeat.isoformat() if last_heartbeat else None
                 })
             return status 
+
+    async def get_guild_info(self, ctx, guild_id: int):
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            await ctx.send("Guild not found.")
+            return
+        
+        info = {
+            'id': guild.id,
+            'name': guild.name,
+            'me': {
+                'permissions': guild.me.guild_permissions.value
+            }
+        }
+        return info
+
+    async def get_member_info(self, data: dict) -> Optional[dict]:
+        """Get member info for a guild"""
+        guild = self.bot.get_guild(data['guild_id'])
+        if not guild:
+            return None
+            
+        member = guild.get_member(data['user_id'])
+        if not member:
+            return None
+            
+        return {
+            'id': member.id,
+            'administrator': member.guild_permissions.administrator
+        }
+
+    async def create_appeal_channels(self, ctx, appeal_server_id: int, guild_id: int):
+        guild = self.bot.get_guild(appeal_server_id)
+        if not guild:
+            return None
+        
+        appeal_channel = await guild.create_text_channel("appeals")
+        logs_channel = await guild.create_text_channel(
+            "appeal-logs",
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            }
+        )
+        
+        embed = discord.Embed(
+            title="Appeal System",
+            description="Click the button below to submit an appeal.",
+            color=discord.Color.blurple()
+        )
+        view = discord.ui.View(timeout=None)
+        view.add_item(AppealButton(modal=True, action_type=None, guild_id=guild_id))
+        await appeal_channel.send(embed=embed, view=view)
+        
+        return {
+            'appeal_channel_id': appeal_channel.id,
+            'logs_channel_id': logs_channel.id
+        } 
