@@ -1,6 +1,6 @@
 import asyncio
 import config
-from core.bot import Evict
+from core.bot import Pride
 from utils.logger import setup_logging, log
 from utils.monitoring import setup_monitoring
 from core.dask import DaskManager
@@ -17,7 +17,7 @@ async def start_cluster(cluster_id: int, shard_ids: list, total_shards: int, das
         log.info(f"Starting cluster {cluster_id} with shards {shard_ids}")
         
         log.info("Creating bot instance...")
-        bot = Evict(
+        bot = Pride(
             cluster_id=cluster_id,
             cluster_count=CLUSTER_COUNT,
             dask_client=dask_client,

@@ -18,7 +18,7 @@ from typing import List, Mapping, Union, Any, Callable, Coroutine
 from core.context import Embed
 
 
-class EvictHelp(MinimalHelpCommand):
+class PrideHelp(MinimalHelpCommand):
     context: "Context"
 
     def __init__(self, **options):

@@ -26,7 +26,7 @@ from typing_extensions import Self
 from xxhash import xxh32_hexdigest
 
 from config import CLIENT
-from main import Evict
+from main import Pride
 from utils.tools import CompositeMetaClass, MixinMeta
 from core import Context, FlagConverter
 from utils.conversions import Duration, Status

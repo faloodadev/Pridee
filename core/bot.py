@@ -47,7 +47,7 @@ from utils.conversions.embed import EmbedScript
 
 from core.http import MonitoredHTTPClient
 from utils.prefix import getprefix
-from core.help import EvictHelp
+from core.help import PrideHelp
 from utils.monitoring import PerformanceMonitoring
 from utils.optimization import setup_cpu_optimizations
 from core.dask import DaskManager
@@ -79,7 +79,7 @@ jishaku.Flags.NO_DM_TRACEBACK = True
 jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.FORCE_PAGINATOR = True
 
-class Evict(commands.AutoShardedBot, commands.Cog):
+class Pride(commands.AutoShardedBot, commands.Cog):
     session: ClientSession
     uptime: datetime
     traceback: Dict[str, Exception]
@@ -90,7 +90,7 @@ class Evict(commands.AutoShardedBot, commands.Cog):
     user: ClientUser
     reddit: RedditClient
     version: str = "b4.0"
-    user_agent: str = f"Evict (DISCORD BOT/{version})"
+    user_agent: str = f"Pride (DISCORD BOT/{version})"
     browser: BrowserHandler
     voice_join_times = {}
     voice_update_task = None
@@ -145,7 +145,7 @@ class Evict(commands.AutoShardedBot, commands.Cog):
                 roles=False,
                 users=True,
             ),
-            help_command=EvictHelp(),
+            help_command=PrideHelp(),
             case_insensitive=True,
             max_messages=1500,
             activity=Activity(

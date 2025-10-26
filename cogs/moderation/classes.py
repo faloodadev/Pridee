@@ -1,4 +1,4 @@
-from main import Evict
+from main import Pride
 from typing import Union, Optional
 from core.context import Context
 from discord.ext import commands
@@ -149,7 +149,7 @@ class Mod:
 class ModConfig:
     @staticmethod
     async def sendlogs(
-        bot: Evict,
+        bot: Pride,
         action: str,
         author: Member,
         victim: Union[Member, User],

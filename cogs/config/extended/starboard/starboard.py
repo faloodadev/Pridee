@@ -23,7 +23,7 @@ from discord.abc import GuildChannel
 from discord.ext.commands import Cog, Range, flag, group, has_permissions
 from discord.utils import find
 
-from main import Evict
+from main import Pride
 from utils.tools import quietly_delete
 from core import Context, FlagConverter
 from utils.conversions import Status
@@ -261,7 +261,7 @@ class Starboard(Cog):
     A starboard to upvote posts obviously.
     """
 
-    def __init__(self, bot: Evict):
+    def __init__(self, bot: Pride):
         self.bot: Evict = bot
 
     @group(

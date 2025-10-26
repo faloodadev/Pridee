@@ -19,7 +19,7 @@ import random
 from datetime import datetime, timedelta, timezone
 import secrets
 
-from main import Evict
+from main import Pride
 from core.context import Context
 from utils.conversions import (
     Duration,
@@ -222,7 +222,7 @@ class ModStatsView(View):
             await interaction.response.send_message(embed=details_embed)
 
 class Moderation(Cog):
-    def __init__(self, bot: Evict):
+    def __init__(self, bot: Pride):
         self.bot = bot
         self.description = "Moderation commands to make things easier."
 

@@ -25,7 +25,7 @@ from discord import (
 )
 from discord.utils import get
 
-from main import Evict
+from main import Pride
 from utils.tools import capture_time
 
 from .types import BackupData, BooleanArgs

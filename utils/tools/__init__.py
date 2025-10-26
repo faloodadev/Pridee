@@ -43,7 +43,7 @@ from humanize import precisedelta
 from utils.tools.mime_tables import mimes
 
 if TYPE_CHECKING:
-    from main import Evict
+    from main import Pride
     from core.context import Context
 
 TMP_ROOT = AsyncPath("/tmp")
@@ -67,7 +67,7 @@ class MixinMeta(commands.Cog, ABC, metaclass=CompositeMetaClass):
     With well-defined mixins, we can avoid the need for multiple inheritance.
     """
 
-    bot: "Evict"
+    bot: "Pride"
 
 
 def fmtseconds(seconds: Union[timedelta, float, int], unit: str = "microseconds") -> str:

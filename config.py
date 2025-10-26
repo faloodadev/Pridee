@@ -232,7 +232,7 @@ class Client(NamedTuple):
     """Discord bot client configuration."""
     TOKEN: str = getenv("DISCORD_TOKEN", "")
     PREFIX: str = getenv("BOT_PREFIX", "!")
-    DESCRIPTION: str = "Evict Discord Bot"
+    DESCRIPTION: str = "Pride Discord Bot"
     OWNER_IDS: List[int] = [
         int(id_) for id_ in getenv("OWNER_IDS", "").split(",") if id_
     ]

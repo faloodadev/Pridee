@@ -8,7 +8,7 @@ from discord import Guild
 from discord.ext.commands import BadArgument
 from discord.ext.commands.view import ExpectedClosingQuoteError, StringView
 
-from main import Evict
+from main import Pride
 from core.context import Context
 
 

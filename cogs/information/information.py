@@ -57,7 +57,7 @@ import discord
 import time
 from pathlib import Path
 
-from main import Evict
+from main import Pride
 
 from utils.tools import dominant_color
 from core.context import Context
@@ -93,7 +93,7 @@ class PollFlags(FlagConverter):
 
 
 class Information(Cog):
-    def __init__(self, bot: Evict):
+    def __init__(self, bot: Pride):
         self.bot = bot
         self.process = Process()
         self.weather_key = "64581e6f1d7d49ae834142709230804"
@@ -2294,7 +2294,7 @@ def parse_duration(duration: str) -> int:
         
     return amount * units[unit]
 
-async def setup(bot: Evict):
+async def setup(bot: Pride):
     """Load the Information cog."""
     log.info(f"Setting up Information cog on cluster {bot.cluster_id}")
     cog = Information(bot)
