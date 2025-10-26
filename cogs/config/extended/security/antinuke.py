@@ -133,7 +133,7 @@ class Settings(BaseModel):
 
     async def dispatch_log(
         self,
-        bot: Evict,
+        bot: "Pride",
         perpetrator: Member,
         *,
         module: str,
@@ -168,7 +168,7 @@ class Settings(BaseModel):
             reason
         )
 
-    async def check_threshold(self, bot: Evict, member: Member, module: str) -> bool:
+    async def check_threshold(self, bot: "Pride", member: Member, module: str) -> bool:
         """
         Check if a member exceeds the threshold for a module.
         """
@@ -198,7 +198,7 @@ class Settings(BaseModel):
         return False
 
     @classmethod
-    async def revalidate(cls, bot: Evict, guild: Guild) -> Optional[Self]:
+    async def revalidate(cls, bot: "Pride", guild: Guild) -> Optional[Self]:
         """
         Revalidate the settings for a guild.
         This will update the cache in redis.
@@ -223,7 +223,7 @@ class Settings(BaseModel):
         return settings
 
     @classmethod
-    async def fetch(cls, bot: Evict, guild: Guild) -> Self:
+    async def fetch(cls, bot: "Pride", guild: Guild) -> Self:
         """
         Fetch the settings for a guild.
         This will cache the settings in redis.
@@ -1330,7 +1330,7 @@ class AntiNuke(MixinMeta, metaclass=CompositeMetaClass):
 
     async def notify_perpetrator(
         self,
-        bot: Evict,
+        bot: "Pride",
         perpetrator: Member,
         *,
         module: str,

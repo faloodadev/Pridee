@@ -103,7 +103,7 @@ class AliasEntry:
 
     @classmethod
     async def get(cls, guild: Guild, name: str) -> Optional[AliasEntry]:
-        bot = cast(Evict, guild._state._get_client())
+        bot = cast(Pride, guild._state._get_client())
 
         record = await bot.db.fetchrow(
             """

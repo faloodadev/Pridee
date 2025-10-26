@@ -175,7 +175,7 @@ class BackupViewer:
 
 
 class BackupLoader:
-    bot: Evict
+    bot: "Pride"
     guild: Guild
     data: BackupData
     options: BooleanArgs
@@ -183,7 +183,7 @@ class BackupLoader:
     reason: str
     id_translator: dict[int, int]
 
-    def __init__(self, bot: Evict, guild: Guild, data: str):
+    def __init__(self, bot: "Pride", guild: Guild, data: str):
         self.bot = bot
         self.guild = guild
         self.data = loads(data)

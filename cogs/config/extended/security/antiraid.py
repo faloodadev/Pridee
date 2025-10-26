@@ -744,7 +744,7 @@ class AntiRaid(MixinMeta, metaclass=CompositeMetaClass):
             if not status:
                 rules = await ctx.guild.fetch_automod_rules()
                 for rule in rules:
-                    if rule.name == f"Evict - {filter_type.title()} Filter":
+                    if rule.name == f"Pride - {filter_type.title()} Filter":
                         await rule.delete()
                 return await ctx.approve(f"Removed {filter_type} filter")
 
@@ -766,13 +766,13 @@ class AntiRaid(MixinMeta, metaclass=CompositeMetaClass):
             exempt_roles = [role for role in ctx.guild.roles if role.permissions.manage_guild]
 
             rule = await ctx.guild.create_automod_rule(
-                name=f"Evict - {filter_type.title()} Filter",
+                name=f"Pride - {filter_type.title()} Filter",
                 event_type=AutoModRuleEventType.message_send,
                 trigger=trigger,
                 actions=actions,
                 enabled=True,
                 exempt_roles=exempt_roles,
-                reason="Created via Evict antiraid filter command"
+                reason="Created via Pride antiraid filter command"
             )
             return await ctx.approve(f"Created {filter_type} filter with **{flags.punishment}** punishment")
 
@@ -798,7 +798,7 @@ class AntiRaid(MixinMeta, metaclass=CompositeMetaClass):
             updated = False
             
             for rule in rules:
-                if rule.name.startswith("Evict -"):
+                if rule.name.startswith("Pride -"):
                     if isinstance(target, Role):
                         if target not in rule.exempt_roles:
                             await rule.edit(exempt_roles=[*rule.exempt_roles, target])
@@ -827,7 +827,7 @@ class AntiRaid(MixinMeta, metaclass=CompositeMetaClass):
             updated = False
             
             for rule in rules:
-                if rule.name.startswith("Evict -"):
+                if rule.name.startswith("Pride -"):
                     if role.id in rule.exempt_roles:
                         await rule.edit(exempt_roles=[r for r in rule.exempt_roles if r != role.id])
                         updated = True
@@ -851,7 +851,7 @@ class AntiRaid(MixinMeta, metaclass=CompositeMetaClass):
             exempt_roles = set()
             
             for rule in rules:
-                if rule.name.startswith("Evict -"):
+                if rule.name.startswith("Pride -"):
                     exempt_roles.update(rule.exempt_roles)
             
             if not exempt_roles:

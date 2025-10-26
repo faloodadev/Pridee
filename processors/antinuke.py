@@ -3,12 +3,15 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from asyncio import gather
 from discord import Member, Guild
-from core import Evict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.bot import Pride
 
 log = getLogger("evict/processors")
 
 async def process_audit_threshold(
-    bot: Evict,
+    bot: "Pride",
     key: str,
     config: Dict[str, Any],
     member: Member,
@@ -23,7 +26,7 @@ async def process_audit_threshold(
     
     return value >= config.threshold
 
-async def process_whitelist_check(bot: Evict, guild: Guild):
+async def process_whitelist_check(bot: "Pride", guild: Guild):
     """Process whitelist check immediately"""
     return await bot.db.fetchrow(
         """
@@ -34,7 +37,7 @@ async def process_whitelist_check(bot: Evict, guild: Guild):
     )
 
 async def process_punishment_data(
-    bot: Evict,
+    bot: "Pride",
     perpetrator: Member,
     module: str,
     action: str,

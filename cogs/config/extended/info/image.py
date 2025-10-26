@@ -219,7 +219,7 @@ class InfoImageGenerator:
         image.paste(chart, (60, 680), chart if chart.mode == 'RGBA' else None)
 
         powered_font = ImageFont.truetype(self.font_path, 18)
-        powered_text = "Powered by Evict"
+        powered_text = "Powered by Pride"
         text_width = int(draw.textlength(powered_text, font=powered_font))
         
         async with aiohttp.ClientSession() as session:
@@ -353,7 +353,7 @@ class InfoImageGenerator:
         image.paste(chart, (60, 680), chart if chart.mode == 'RGBA' else None)
 
         powered_font = ImageFont.truetype(self.font_path, 18)
-        powered_text = "Powered by Evict"
+        powered_text = "Powered by Pride"
         text_width = int(draw.textlength(powered_text, font=powered_font))
         
         async with aiohttp.ClientSession() as session:
@@ -505,7 +505,7 @@ class InfoImageGenerator:
         image.paste(chart, (60, y_pos + 60), chart if chart.mode == 'RGBA' else None)
 
         powered_font = ImageFont.truetype(self.font_path, 18)
-        powered_text = "Powered by Evict"
+        powered_text = "Powered by Pride"
         text_width = int(draw.textlength(powered_text, font=powered_font))
         
         async with aiohttp.ClientSession() as session:

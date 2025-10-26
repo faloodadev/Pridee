@@ -42,14 +42,14 @@ class StarboardRecord(TypedDict):
 
 
 class StarboardConfig:
-    bot: Evict
+    bot: "Pride"
     guild_id: int
     channel_id: int
     self_star: bool
     threshold: int
     emoji: str
 
-    def __init__(self, *, bot: Evict, record: StarboardRecord):
+    def __init__(self, *, bot: "Pride", record: StarboardRecord):
         self.bot = bot
         self.guild_id = record["guild_id"]
         self.channel_id = record["channel_id"]
@@ -262,7 +262,7 @@ class Starboard(Cog):
     """
 
     def __init__(self, bot: Pride):
-        self.bot: Evict = bot
+        self.bot: Pride = bot
 
     @group(
         aliases=["star", "board", "sb"],
