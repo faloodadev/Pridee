@@ -42,7 +42,7 @@ yarl>=1.9.4
 
 anyio
 cairosvg
-colortheif
+colorthief
 cryptography
 wand
 aiomisc
