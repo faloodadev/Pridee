@@ -18,29 +18,24 @@ class AUTHORIZATION:
     """
     API keys for various services.
     """
-    FNBR: str = "20490584-82aa-4ac3-8831-73d411d7c3d2"
-    CLEVER: str = "CC9db9SL-aX3lL2t0GLBfTTkTug"
-    WOLFRAM: str = "W95RJG-RRUXURP6XY"
-    WEATHER: str = "0c5b47ed5774413c90b155456223004"
-    OSU: str = "69c45249d9df06a933041e8da565392b458f80fc"
+    FNBR: str = getenv("FNBR_API_KEY", "")
+    CLEVER: str = getenv("CLEVER_API_KEY", "")
+    WOLFRAM: str = getenv("WOLFRAM_API_KEY", "")
+    WEATHER: str = getenv("WEATHER_API_KEY", "")
+    OSU: str = getenv("OSU_API_KEY", "")
     LASTFM: list[str] = [
-        "bc84a74e4b3cf9eb040fbeaab4071df5",
-        "4210d59afeeb6c350442d7141747704c",
-    ]
-    SOUNDCLOUD: str = "OAuth 2-292593-994587358-Af8VbLnc6zIplJ"
-    GEMINI: str = "AIzaSyCjgGH83OyUblhY4JHMQFJ5j3UVH5ztkaA"
-    KRAKEN: str = "NjEyZTQyMzIwZTE4OWQ3OeLx-wiasK1ZCCKRbrPE13dJfF64AetJ4HvFef4w9c0s"
-    FERNET_KEY: str = "0GKftpvX45aoHDZ1p4_OgYuaoPnI2TEPnJGeuvPjXjg="
-    PIPED_API: str = "pipedapi.adminforge.de"
-    PUBSUB_KEY: str = "qXhjfaXxt2e_2WrkWwx3QR"
-    IPC_KEY: str = "ZguzxNhhtz4PG6zOaD0"
-    JEYY_API: str = "74PJ0CPO6COJ6C9O6OPJGD1I70OJC.CLR6IORK.lkpD588_z_FMB40-Nl6L1w"
-    OPENAI: str = (
-     "Your api key "
-    )
-    LOVENSE: str = (
-     "-X1p4MV3pUVZoygskhfrkisx69F7y2LJJzglk_d51s-rackNZPcogzu48d5Z4EHD"
-    )
+        key for key in getenv("LASTFM_API_KEYS", "").split(",") if key
+    ] or []
+    SOUNDCLOUD: str = getenv("SOUNDCLOUD_API_KEY", "")
+    GEMINI: str = getenv("GEMINI_API_KEY", "")
+    KRAKEN: str = getenv("KRAKEN_API_KEY", "")
+    FERNET_KEY: str = getenv("FERNET_KEY", "")
+    PIPED_API: str = getenv("PIPED_API", "pipedapi.adminforge.de")
+    PUBSUB_KEY: str = getenv("PUBSUB_KEY", "")
+    IPC_KEY: str = getenv("IPC_KEY", "")
+    JEYY_API: str = getenv("JEYY_API_KEY", "")
+    OPENAI: str = getenv("OPENAI_API_KEY", "")
+    LOVENSE: str = getenv("LOVENSE_API_KEY", "")
 
 class EMOJIS:
     """
