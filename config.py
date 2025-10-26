@@ -36,7 +36,7 @@ class AUTHORIZATION:
     IPC_KEY: str = "ZguzxNhhtz4PG6zOaD0"
     JEYY_API: str = "74PJ0CPO6COJ6C9O6OPJGD1I70OJC.CLR6IORK.lkpD588_z_FMB40-Nl6L1w"
     OPENAI: str = (
-     "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"
+     "Your api key "
     )
     LOVENSE: str = (
      "-X1p4MV3pUVZoygskhfrkisx69F7y2LJJzglk_d51s-rackNZPcogzu48d5Z4EHD"
