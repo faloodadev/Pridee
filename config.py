@@ -187,8 +187,8 @@ class EMOJIS:
         Changes the emojis on the Lovense commands.
         """
         LOVENSE: str = "<:lovense:1321525243549974539>"
-        KEY: str = "b5c0e61d3ff07bf8"
-        IV: str = "EAB712083AB0310A"
+        KEY: str = getenv("LOVENSE_KEY", "")
+        IV: str = getenv("LOVENSE_IV", "")
 
 class Database(NamedTuple):
     """PostgreSQL database configuration."""
