@@ -85,7 +85,8 @@ class BrowserHandler:
                 
             except Exception as e:
                 log.error(f"Failed to initialize browser: {e}")
-                raise
+                log.warning("Browser features will be disabled. Bot will continue without browser functionality.")
+                # Don't raise - allow bot to continue without browser
 
     @asynccontextmanager
     async def borrow_page(self) -> AsyncGenerator[Page, None]:
