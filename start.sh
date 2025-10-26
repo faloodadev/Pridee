@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export MAGICK_HOME="/nix/store/w9393s0xnbdy4v0dqlb1i5iv305bdnz9-imagemagick-7.1.1-47"
+export LD_LIBRARY_PATH="${MAGICK_HOME}/lib:${LD_LIBRARY_PATH}"
+
 echo "Starting Redis server..."
 redis-server --daemonize yes --port 6379 --bind 127.0.0.1 --loglevel warning
 

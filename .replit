@@ -5,3 +5,90 @@ expertMode = true
 [nix]
 channel = "stable-25_05"
 packages = ["redis", "postgresql", "imagemagick", "cairo", "pkg-config"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Discord Bot"
+
+[[workflows.workflow]]
+name = "Discord Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash start.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[ports]]
+localPort = 8787
+externalPort = 3000
+
+[[ports]]
+localPort = 28000
+externalPort = 80
+
+[[ports]]
+localPort = 28001
+externalPort = 5173
+
+[[ports]]
+localPort = 28002
+externalPort = 6000
+
+[[ports]]
+localPort = 28003
+externalPort = 6800
+
+[[ports]]
+localPort = 28004
+externalPort = 8000
+
+[[ports]]
+localPort = 33313
+externalPort = 5000
+
+[[ports]]
+localPort = 34423
+externalPort = 3003
+
+[[ports]]
+localPort = 35279
+externalPort = 9000
+
+[[ports]]
+localPort = 35839
+externalPort = 8080
+
+[[ports]]
+localPort = 36185
+externalPort = 3002
+
+[[ports]]
+localPort = 39109
+externalPort = 3001
+
+[[ports]]
+localPort = 41661
+externalPort = 4200
+
+[[ports]]
+localPort = 42337
+externalPort = 8099
+
+[[ports]]
+localPort = 43667
+externalPort = 8081
+
+[[ports]]
+localPort = 45247
+externalPort = 8008
