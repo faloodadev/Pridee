@@ -34,7 +34,6 @@ ENV/
 *.log
 
 # Local config
-config.py
 .env
 
 # Database
