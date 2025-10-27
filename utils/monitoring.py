@@ -39,26 +39,10 @@ class PerformanceMonitoring:
             })
             
             trace_provider = TracerProvider(resource=resource)
-            
-            jaeger_exporter = JaegerExporter(
-                agent_host_name="67.219.138.179",
-                agent_port=6831,
-                collector_endpoint="http://67.219.138.179:14268/api/traces",
-            )
-            
-            processor = BatchSpanProcessor(jaeger_exporter)
-            trace_provider.add_span_processor(processor)
-            
             trace.set_tracer_provider(trace_provider)
-            
-            log.info(f"Initialized Jaeger exporter at {jaeger_exporter.collector_endpoint}")
-            
             self.tracer = trace.get_tracer(service_name)
             
-            with self.tracer.start_as_current_span("test_initialization") as span:
-                span.set_attribute("test", "true")
-                span.set_attribute("timestamp", time.time())
-                log.info("Created test span for Jaeger verification")
+            log.info("Jaeger exporter disabled (external service not available in Replit)")
 
             reader = PrometheusMetricReader()
             meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
@@ -112,7 +96,6 @@ class PerformanceMonitoring:
             })
             self._last_cleanup = time.time()
             log.info(f"Performance monitoring initialized for service {service_name}")
-            log.info("Connected to Jaeger at 67.219.138.179:6831")
 
         except Exception as e:
             log.error(f"Failed to initialize performance monitoring: {e}", exc_info=True)
