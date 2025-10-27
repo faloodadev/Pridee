@@ -59,17 +59,14 @@ cleanup() {
 configure_imagemagick() {
     log_info "Configuring ImageMagick..."
     
-    # Try to find ImageMagick automatically
-    MAGICK_PATH=$(find /nix/store -name "imagemagick-*" -type d 2>/dev/null | head -1 || echo "")
+    # Use fixed path for ImageMagick (much faster than searching)
+    export MAGICK_HOME="/nix/store/w9393s0xnbdy4v0dqlb1i5iv305bdnz9-imagemagick-7.1.1-47"
+    export LD_LIBRARY_PATH="${MAGICK_HOME}/lib:${LD_LIBRARY_PATH:-}"
     
-    if [ -n "$MAGICK_PATH" ]; then
-        export MAGICK_HOME="$MAGICK_PATH"
-        export LD_LIBRARY_PATH="${MAGICK_HOME}/lib:${LD_LIBRARY_PATH:-}"
-        log_success "ImageMagick configured at: $MAGICK_PATH"
+    if [ -d "$MAGICK_HOME" ]; then
+        log_success "ImageMagick configured at: $MAGICK_HOME"
     else
-        log_warning "ImageMagick path not found, using default path"
-        export MAGICK_HOME="/nix/store/w9393s0xnbdy4v0dqlb1i5iv305bdnz9-imagemagick-7.1.1-47"
-        export LD_LIBRARY_PATH="${MAGICK_HOME}/lib:${LD_LIBRARY_PATH:-}"
+        log_warning "ImageMagick path not found (non-critical)"
     fi
 }
 
