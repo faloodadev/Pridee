@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["redis", "postgresql", "imagemagick", "cairo", "pkg-config"]
+packages = ["arrow-cpp", "cairo", "cargo", "ffmpeg-full", "freetype", "gettext", "ghostscript", "gitFull", "gobject-introspection", "gtk3", "imagemagick", "imagemagickBig", "libGL", "libGLU", "libiconv", "libxcrypt", "oneDNN", "openssl", "pkg-config", "playwright-driver", "postgresql", "qhull", "rapidfuzz-cpp", "re2", "redis", "rustc", "taskflow", "tcl", "tk", "xsimd", "pango"]
 
 [workflows]
 runButton = "Project"
