@@ -82,13 +82,13 @@ async def main():
             )
             cluster_tasks.append(task)
         
+        clusters = []
         try:
-            clusters = []
             results = await asyncio.gather(*cluster_tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
                     log.error(f"Cluster failed to start: {result}")
-                else:
+                elif isinstance(result, tuple):
                     bot, bot_task = result
                     clusters.append((bot, bot_task))
             

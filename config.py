@@ -257,10 +257,10 @@ class Cache(NamedTuple):
     TTL: int = 300  
     MAX_SIZE: int = 10000
 
-COLORS = COLORS()
-EMOJIS = EMOJIS()
+COLORS = COLORS()  # type: ignore
+EMOJIS = EMOJIS()  # type: ignore
 DATABASE = Database()
-REDIS = REDIS()
+REDIS = REDIS()  # type: ignore
 MONITORING = Monitoring()
 LOGGING = Logging()
 CLIENT = Client()
