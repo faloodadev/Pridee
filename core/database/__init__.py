@@ -93,11 +93,11 @@ async def create_db_pool() -> Database:
             config.DATABASE.DSN,
             record_class=Record,
             init=init_connection,
-            min_size=10,
-            max_size=20,
-            max_queries=50000,
+            min_size=config.DATABASE.MIN_SIZE,
+            max_size=config.DATABASE.MAX_SIZE,
+            max_queries=config.DATABASE.MAX_QUERIES,
             max_inactive_connection_lifetime=300.0,
-            command_timeout=60.0,
+            command_timeout=config.DATABASE.COMMAND_TIMEOUT,
         )
         if not pool:
             raise RuntimeError("Failed to establish PostgreSQL connection!")

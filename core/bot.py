@@ -220,6 +220,10 @@ class Pride(commands.AutoShardedBot, commands.Cog):
             command_timeout=config.DATABASE.COMMAND_TIMEOUT
         )
         log.info("Connected to database")
+        
+        # Run database migrations
+        from core.migrations import run_migrations
+        await run_migrations(self.database)
 
         self.redis = Redis.from_url(config.REDIS.DSN)
         log.info("Connected to Redis")

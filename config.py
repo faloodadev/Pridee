@@ -193,8 +193,8 @@ class EMOJIS:
 class Database(NamedTuple):
     """PostgreSQL database configuration."""
     DSN: str = getenv("DATABASE_URL", "postgresql://postgres:admin@localhost/evict")
-    MIN_SIZE: int = 10
-    MAX_SIZE: int = 20
+    MIN_SIZE: int = int(getenv("DB_MIN_POOL_SIZE", "1"))
+    MAX_SIZE: int = int(getenv("DB_MAX_POOL_SIZE", "5"))
     MAX_QUERIES: int = 50000
     TIMEOUT: float = 60.0
     COMMAND_TIMEOUT: float = 60.0
