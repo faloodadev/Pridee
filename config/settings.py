@@ -44,9 +44,9 @@ class LAVALINK:
     Lavalink authentication node.
     """
     NODE_COUNT: int = 1
-    HOST: str = "127.0.0.1"
-    PORT: int = 2333
-    PASSWORD: str = "youshallnotpass"
+    HOST: str = "vip.visionhost.cloud"
+    PORT: int = 2010
+    PASSWORD: str = "abcd"
 
 class COLORS:
     """
