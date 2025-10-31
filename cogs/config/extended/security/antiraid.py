@@ -26,7 +26,7 @@ from utils.conversions import Status
 from utils.tools.formatter import plural
 import discord 
 from utils.conversions.embed import EmbedScript
-from cogs.moderation.classes import ModConfig
+from moderation.classes import ModConfig
 
 log = getLogger("evict/raid")
 

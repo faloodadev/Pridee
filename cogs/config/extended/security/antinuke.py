@@ -33,7 +33,7 @@ from utils.conversions import Duration, Status
 from utils.tools.formatter import codeblock, plural
 from managers.paginator import Paginator
 from utils.conversions.embed import EmbedScript
-from cogs.moderation.classes import ModConfig
+from moderation.classes import ModConfig
 from datetime import datetime, timezone
 import config
 

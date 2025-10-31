@@ -141,15 +141,15 @@ cleanup() {
 configure_imagemagick() {
     log_info "Configuring ImageMagick libraries..."
     
-    # Find ImageMagick in Nix store
-    local magick_path=$(find /nix/store -maxdepth 1 -name "*imagemagick*" -type d 2>/dev/null | head -1)
+    # Find ImageMagick in Nix store with timeout
+    local magick_path=$(timeout 3 find /nix/store -maxdepth 1 -name "*imagemagick*" -type d 2>/dev/null | head -1 || echo "")
     
-    if [ -n "$magick_path" ]; then
+    if [ -n "$magick_path" ] && [ -d "$magick_path" ]; then
         export MAGICK_HOME="$magick_path"
         export LD_LIBRARY_PATH="${MAGICK_HOME}/lib:${LD_LIBRARY_PATH:-}"
         log_success "ImageMagick configured: ${MAGICK_HOME##*/}"
     else
-        log_warning "ImageMagick not found (image features may be limited)"
+        log_info "ImageMagick auto-detect skipped (system default will be used)"
     fi
 }
 
