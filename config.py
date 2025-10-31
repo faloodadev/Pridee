@@ -8,10 +8,10 @@ class COLORS:
     """
     Changes the colors on context outputs.
     """
-    NEUTRAL = 0xFFFFFF
-    APPROVE = 0xFFFFFF
-    WARN = 0xFFFFFF
-    DENY = 0xFFFFFF
+    NEUTRAL = 0x2b2d31
+    APPROVE = 0x2b2d31
+    WARN = 0x2b2d31
+    DENY = 0x2b2d31
     SPOTIFY = 0x1DB954
 
 class AUTHORIZATION:
