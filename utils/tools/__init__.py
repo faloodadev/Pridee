@@ -36,7 +36,12 @@ from discord.ui import Button as OriginalButton
 from discord.ui import View as OriginalView
 from jishaku.functools import executor_function
 from tornado.escape import url_unescape
-from wand.image import Image
+try:
+    from wand.image import Image
+    WAND_AVAILABLE = True
+except (ImportError, OSError):
+    WAND_AVAILABLE = False
+    Image = None
 from datetime import timedelta
 from humanize import precisedelta
 

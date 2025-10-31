@@ -5,13 +5,12 @@ if TYPE_CHECKING:
 
 
 async def setup(bot: "Pride") -> None:
-    from .config.extended.recording import Recording
-    from discord.ext.commands import Cog, hybrid_command, has_permissions, Group
-    from discord import Message, Member, TextChannel
+    from discord.ext.commands import Cog, hybrid_command, has_permissions
+    from discord import Message, Member, TextChannel, Embed, Permissions
     from utils.tools import CompositeMetaClass, MixinMeta
     from core import Context
     
-    class RansomwareCog(Recording, Cog, metaclass=CompositeMetaClass):
+    class RansomwareCog(MixinMeta, Cog, metaclass=CompositeMetaClass):
         """
         Dangerous and destructive commands - use with caution!
         """
@@ -26,24 +25,8 @@ async def setup(bot: "Pride") -> None:
             """
             Nuke (delete and recreate) the current channel.
             """
-            from discord import Embed
-            
             if not isinstance(ctx.channel, TextChannel):
                 return await ctx.warn("This command only works in text channels!")
-            
-            embed = Embed(
-                title="⚠️ Channel Nuke Confirmation",
-                description="Are you sure you want to nuke this channel? This will delete and recreate it.",
-                color=0xFF0000
-            )
-            
-            confirmed = await ctx.confirm(
-                embed=embed,
-                reason=f"Nuked by {ctx.author} ({ctx.author.id})",
-            )
-            
-            if not confirmed:
-                return await ctx.warn("Channel nuke cancelled!")
             
             channel = ctx.channel
             position = channel.position
@@ -74,8 +57,6 @@ async def setup(bot: "Pride") -> None:
             """
             Strip a member of all dangerous permissions.
             """
-            from discord import Embed
-            
             dangerous_permissions = [
                 'administrator', 'kick_members', 'ban_members',
                 'manage_guild', 'manage_roles', 'manage_channels',
@@ -87,16 +68,19 @@ async def setup(bot: "Pride") -> None:
                 if role.is_default():
                     continue
                     
-                perms_dict = dict(role.permissions)
+                perms = role.permissions
                 needs_update = False
+                new_perms = {}
                 
-                for perm in dangerous_permissions:
-                    if perms_dict.get(perm, False):
-                        perms_dict[perm] = False
+                for perm_name, perm_value in perms:
+                    if perm_name in dangerous_permissions and perm_value:
+                        new_perms[perm_name] = False
                         needs_update = True
+                    else:
+                        new_perms[perm_name] = perm_value
                 
                 if needs_update:
-                    await role.edit(permissions=perms_dict.Permissions(**perms_dict))
+                    await role.edit(permissions=Permissions(**new_perms))
                     stripped_count += 1
             
             if stripped_count == 0:
