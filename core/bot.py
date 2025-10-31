@@ -508,6 +508,13 @@ class Pride(commands.AutoShardedBot, commands.Cog):
                     await self.load_extension(".".join(feature.parts))
                 except Exception as exc:
                     log.exception(f"Failed to load extension {feature.name}.", exc_info=exc)
+            elif feature.is_file() and feature.suffix == ".py" and not feature.name.startswith("_"):
+                try:
+                    module_name = f"cogs.{feature.stem}"
+                    await self.load_extension(module_name)
+                    log.info(f"Loaded extension: {module_name}")
+                except Exception as exc:
+                    log.exception(f"Failed to load extension {feature.name}.", exc_info=exc)
 
     async def load_patches(self) -> None:
         """Load all patches."""
