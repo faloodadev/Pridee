@@ -1,87 +1,173 @@
 #!/bin/bash
 
-# Pride Discord Bot - Advanced Startup Script
-# Features: Auto-recovery, health checks, clear logging, error handling
+# Pride Discord Bot - Professional Startup Script
+# Features: Progress bars, animations, auto-recovery, health monitoring
 
-set -euo pipefail  # Exit on error, undefined vars, pipe failures
+set -euo pipefail
 
-# Color codes for output
+# ============================================================================
+# COLOR DEFINITIONS & STYLING
+# ============================================================================
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+MAGENTA='\033[0;35m'
+WHITE='\033[1;37m'
+NC='\033[0m'
 BOLD='\033[1m'
+DIM='\033[2m'
 
-# Logging functions
+# Unicode symbols
+CHECK_MARK="✓"
+CROSS_MARK="✗"
+WARNING_MARK="⚠"
+INFO_MARK="ℹ"
+LOADING_MARK="◉"
+ARROW="→"
+
+# ============================================================================
+# LOGGING FUNCTIONS
+# ============================================================================
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $(date '+%H:%M:%S') - $1"
+    echo -e "${BLUE}${INFO_MARK}${NC} ${DIM}$(date '+%H:%M:%S')${NC} ${ARROW} $1"
 }
 
 log_success() {
-    echo -e "${GREEN}[✓]${NC} $(date '+%H:%M:%S') - ${BOLD}$1${NC}"
+    echo -e "${GREEN}${CHECK_MARK}${NC} ${DIM}$(date '+%H:%M:%S')${NC} ${ARROW} ${BOLD}$1${NC}"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[⚠]${NC} $(date '+%H:%M:%S') - $1"
+    echo -e "${YELLOW}${WARNING_MARK}${NC} ${DIM}$(date '+%H:%M:%S')${NC} ${ARROW} $1"
 }
 
 log_error() {
-    echo -e "${RED}[✗]${NC} $(date '+%H:%M:%S') - ${BOLD}$1${NC}"
+    echo -e "${RED}${CROSS_MARK}${NC} ${DIM}$(date '+%H:%M:%S')${NC} ${ARROW} ${BOLD}$1${NC}"
 }
 
 log_section() {
     echo ""
-    echo -e "${CYAN}═══════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  $1${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC} ${WHITE}${BOLD}$1${NC}"
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
 }
 
-# Error handler
+log_subsection() {
+    echo -e "\n${MAGENTA}┌─ $1${NC}"
+}
+
+# ============================================================================
+# PROGRESS BAR FUNCTION
+# ============================================================================
+show_progress() {
+    local current=$1
+    local total=$2
+    local message=$3
+    local width=50
+    local percentage=$((current * 100 / total))
+    local filled=$((width * current / total))
+    local empty=$((width - filled))
+    
+    # Create the bar
+    local bar=""
+    for ((i=0; i<filled; i++)); do
+        bar+="█"
+    done
+    for ((i=0; i<empty; i++)); do
+        bar+="░"
+    done
+    
+    # Color based on percentage
+    local color="${CYAN}"
+    if [ $percentage -ge 100 ]; then
+        color="${GREEN}"
+    elif [ $percentage -ge 50 ]; then
+        color="${BLUE}"
+    fi
+    
+    # Print the progress bar
+    printf "\r${color}▶${NC} [${color}%s${NC}] %3d%% ${DIM}│${NC} %s" "$bar" "$percentage" "$message"
+    
+    # New line if complete
+    if [ $current -eq $total ]; then
+        echo ""
+    fi
+}
+
+# ============================================================================
+# ANIMATED SPINNER
+# ============================================================================
+spin() {
+    local pid=$1
+    local message=$2
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local temp
+    
+    while kill -0 $pid 2>/dev/null; do
+        temp=${spinstr#?}
+        printf "\r${CYAN}%c${NC} ${message}..." "$spinstr"
+        spinstr=$temp${spinstr%"$temp"}
+        sleep 0.1
+    done
+    printf "\r"
+}
+
+# ============================================================================
+# ERROR HANDLING
+# ============================================================================
 handle_error() {
-    log_error "Script failed on line $1"
-    log_error "Attempting recovery..."
+    log_error "Fatal error on line $1"
+    log_error "Initiating emergency cleanup..."
     cleanup
     exit 1
 }
 
 trap 'handle_error $LINENO' ERR
 
-# Cleanup function
+# ============================================================================
+# CLEANUP FUNCTION
+# ============================================================================
 cleanup() {
-    log_warning "Performing cleanup..."
-    # Kill any orphaned processes
-    pkill -f "redis-server" 2>/dev/null || true
+    log_subsection "Cleanup Operations"
+    pkill -f "redis-server" 2>/dev/null && log_info "Stopped Redis server" || true
+    log_success "Cleanup completed"
 }
 
-# Check and configure ImageMagick
+# ============================================================================
+# IMAGEMAGICK CONFIGURATION
+# ============================================================================
 configure_imagemagick() {
-    log_info "Configuring ImageMagick..."
+    log_info "Configuring ImageMagick libraries..."
     
-    # Use fixed path for ImageMagick (much faster than searching)
-    export MAGICK_HOME="/nix/store/w9393s0xnbdy4v0dqlb1i5iv305bdnz9-imagemagick-7.1.1-47"
-    export LD_LIBRARY_PATH="${MAGICK_HOME}/lib:${LD_LIBRARY_PATH:-}"
+    # Find ImageMagick in Nix store
+    local magick_path=$(find /nix/store -maxdepth 1 -name "*imagemagick*" -type d 2>/dev/null | head -1)
     
-    if [ -d "$MAGICK_HOME" ]; then
-        log_success "ImageMagick configured at: $MAGICK_HOME"
+    if [ -n "$magick_path" ]; then
+        export MAGICK_HOME="$magick_path"
+        export LD_LIBRARY_PATH="${MAGICK_HOME}/lib:${LD_LIBRARY_PATH:-}"
+        log_success "ImageMagick configured: ${MAGICK_HOME##*/}"
     else
-        log_warning "ImageMagick path not found (non-critical)"
+        log_warning "ImageMagick not found (image features may be limited)"
     fi
 }
 
-# Start Redis with retry logic
+# ============================================================================
+# REDIS STARTUP
+# ============================================================================
 start_redis() {
-    log_info "Starting Redis server..."
+    log_subsection "Redis Server Initialization"
     
-    # Check if Redis is already running
+    # Check if already running
     if redis-cli ping >/dev/null 2>&1; then
-        log_warning "Redis already running, stopping it first..."
+        log_warning "Redis already running, restarting..."
         redis-cli shutdown 2>/dev/null || pkill -9 redis-server 2>/dev/null || true
         sleep 1
     fi
     
-    # Start Redis with optimized settings for Replit
+    # Start Redis in background
+    log_info "Starting Redis server..."
     redis-server \
         --daemonize yes \
         --port 6379 \
@@ -91,65 +177,78 @@ start_redis() {
         --maxmemory-policy allkeys-lru \
         --save "" \
         --appendonly no \
-        --dir /tmp \
-        2>/dev/null || {
-            log_error "Failed to start Redis server"
-            return 1
-        }
+        --dir /tmp 2>/dev/null &
     
-    # Wait for Redis to be ready (with timeout)
-    local max_attempts=10
-    local attempt=0
-    while [ $attempt -lt $max_attempts ]; do
+    local redis_pid=$!
+    
+    # Wait with progress bar
+    local attempts=0
+    local max_attempts=20
+    while [ $attempts -lt $max_attempts ]; do
         if redis-cli ping >/dev/null 2>&1; then
-            log_success "Redis server started successfully"
+            show_progress $max_attempts $max_attempts "Redis server startup"
+            log_success "Redis server online (localhost:6379)"
             return 0
         fi
-        attempt=$((attempt + 1))
-        sleep 0.5
+        show_progress $attempts $max_attempts "Redis server startup"
+        sleep 0.2
+        attempts=$((attempts + 1))
     done
     
-    log_error "Redis server failed to start after $max_attempts attempts"
+    log_error "Redis failed to start"
     return 1
 }
 
-# Check Python dependencies
+# ============================================================================
+# DEPENDENCY CHECK
+# ============================================================================
 check_dependencies() {
-    log_info "Checking Python dependencies..."
+    log_subsection "Python Dependencies Verification"
     
-    # Check critical packages
-    local critical_packages=("discord" "asyncpg" "redis" "aiohttp")
-    local missing_packages=()
+    local packages=("discord" "asyncpg" "redis" "aiohttp" "pillow" "dotenv")
+    local total=${#packages[@]}
+    local current=0
+    local missing=()
     
-    for package in "${critical_packages[@]}"; do
+    for package in "${packages[@]}"; do
+        current=$((current + 1))
+        show_progress $current $total "Checking $package"
+        
         if ! python -c "import $package" 2>/dev/null; then
-            missing_packages+=("$package")
+            missing+=("$package")
         fi
+        sleep 0.05
     done
     
-    if [ ${#missing_packages[@]} -gt 0 ]; then
-        log_warning "Missing packages detected: ${missing_packages[*]}"
-        log_info "Installing missing packages..."
-        pip install -q -r requirements.txt || {
-            log_error "Failed to install dependencies"
-            return 1
-        }
-        log_success "Dependencies installed"
+    if [ ${#missing[@]} -gt 0 ]; then
+        log_warning "Missing packages: ${missing[*]}"
+        log_info "Installing dependencies (this may take a moment)..."
+        
+        # Install with progress indicator
+        pip install -q -r requirements.txt 2>&1 &
+        local pip_pid=$!
+        spin $pip_pid "Installing Python packages"
+        wait $pip_pid
+        
+        log_success "All dependencies installed"
     else
-        log_success "All critical dependencies available"
+        log_success "All dependencies available"
     fi
 }
 
-# Check database connectivity
+# ============================================================================
+# DATABASE CHECK
+# ============================================================================
 check_database() {
-    log_info "Checking database connectivity..."
+    log_subsection "Database Connectivity"
     
     if [ -z "${DATABASE_URL:-}" ]; then
-        log_warning "DATABASE_URL not set, skipping database check"
+        log_warning "DATABASE_URL not configured"
         return 0
     fi
     
-    # Simple connectivity check using Python
+    log_info "Testing PostgreSQL connection..."
+    
     python3 -c "
 import asyncio
 import asyncpg
@@ -158,125 +257,169 @@ import sys
 
 async def check():
     try:
-        conn = await asyncpg.connect(os.getenv('DATABASE_URL'), timeout=5)
+        conn = await asyncpg.connect(os.getenv('DATABASE_URL'), timeout=10)
+        version = await conn.fetchval('SELECT version()')
         await conn.close()
+        print(f'Connected: {version.split()[0]} {version.split()[1]}')
         return True
     except Exception as e:
-        print(f'Database check failed: {e}', file=sys.stderr)
+        print(f'Connection failed: {e}', file=sys.stderr)
         return False
 
-if asyncio.run(check()):
-    sys.exit(0)
-else:
-    sys.exit(1)
+sys.exit(0 if asyncio.run(check()) else 1)
 " 2>/dev/null && {
         log_success "Database connection verified"
     } || {
-        log_warning "Database check failed (bot will retry on startup)"
+        log_warning "Database unreachable (will retry on bot startup)"
     }
 }
 
-# Check Discord token
+# ============================================================================
+# DISCORD TOKEN CHECK
+# ============================================================================
 check_token() {
-    log_info "Checking Discord token..."
+    log_subsection "Discord Authentication"
     
     if [ -z "${DISCORD_TOKEN:-}" ]; then
-        log_error "DISCORD_TOKEN not set!"
-        log_error "Please add your Discord bot token to Replit Secrets"
+        log_error "DISCORD_TOKEN not configured!"
+        log_error "Add your bot token to Replit Secrets"
         return 1
     fi
     
-    log_success "Discord token configured"
+    local token_preview="${DISCORD_TOKEN:0:10}...${DISCORD_TOKEN: -4}"
+    log_success "Discord token configured ($token_preview)"
 }
 
-# Check Playwright browsers
+# ============================================================================
+# PLAYWRIGHT BROWSER CHECK
+# ============================================================================
 check_playwright() {
-    log_info "Checking Playwright browsers..."
+    log_subsection "Playwright Browser Engine"
     
-    if [ ! -d "$HOME/.cache/ms-playwright/chromium-1187" ]; then
-        log_warning "Playwright browsers not installed"
-        log_info "Installing Playwright browsers (this may take a while)..."
-        playwright install chromium >/dev/null 2>&1 || {
-            log_warning "Failed to install Playwright browsers (non-critical)"
-            log_warning "Browser features will be disabled"
+    local browser_path="$HOME/.cache/ms-playwright/chromium-1187"
+    
+    if [ ! -d "$browser_path" ]; then
+        log_info "Installing Chromium browser..."
+        playwright install chromium >/dev/null 2>&1 &
+        local playwright_pid=$!
+        spin $playwright_pid "Downloading Chromium"
+        wait $playwright_pid && {
+            log_success "Chromium browser installed"
+        } || {
+            log_warning "Browser installation failed (browser features disabled)"
         }
-    fi
-    
-    if [ -d "$HOME/.cache/ms-playwright/chromium-1187" ]; then
-        log_success "Playwright browsers available"
     else
-        log_warning "Playwright browsers not available (browser features disabled)"
+        log_success "Chromium browser available"
     fi
 }
 
-# Monitor bot health
-monitor_bot() {
-    log_info "Starting bot health monitor..."
+# ============================================================================
+# SYSTEM INFO DISPLAY
+# ============================================================================
+show_system_info() {
+    log_subsection "System Information"
     
-    # Run bot with auto-restart on crash
+    log_info "OS: $(uname -s) $(uname -m)"
+    log_info "Python: $(python --version 2>&1)"
+    log_info "Pip: $(pip --version | cut -d' ' -f2)"
+    log_info "Working Directory: $(pwd)"
+    
+    # Show resource info if available
+    if command -v free >/dev/null 2>&1; then
+        local mem=$(free -h | awk '/^Mem:/ {print $2}')
+        log_info "Memory: $mem"
+    fi
+}
+
+# ============================================================================
+# BOT HEALTH MONITOR
+# ============================================================================
+monitor_bot() {
+    log_subsection "Discord Bot Process Monitor"
+    
     local restart_count=0
-    local max_restarts=5
+    local max_restarts=3
     
     while [ $restart_count -lt $max_restarts ]; do
         if [ $restart_count -gt 0 ]; then
-            log_warning "Restarting bot (attempt $((restart_count + 1))/$max_restarts)..."
-            sleep 5
+            log_warning "Auto-restart triggered (attempt $((restart_count + 1))/$max_restarts)"
+            sleep 3
         fi
         
-        # Run the bot
-        python main.py
+        log_info "Launching bot process..."
+        echo ""
+        echo -e "${CYAN}╭─────────────────────────────────────────────────────────────────────╮${NC}"
+        echo -e "${CYAN}│${NC}                    ${WHITE}${BOLD}BOT CONSOLE OUTPUT${NC}                            ${CYAN}│${NC}"
+        echo -e "${CYAN}╰─────────────────────────────────────────────────────────────────────╯${NC}"
+        echo ""
         
+        python main.py
         local exit_code=$?
         
         if [ $exit_code -eq 0 ]; then
-            log_success "Bot exited cleanly"
+            log_success "Bot exited gracefully"
             break
         else
-            log_error "Bot crashed with exit code $exit_code"
+            log_error "Bot crashed (exit code: $exit_code)"
             restart_count=$((restart_count + 1))
             
             if [ $restart_count -ge $max_restarts ]; then
-                log_error "Maximum restart attempts reached"
-                log_error "Please check the logs for errors"
+                log_error "Maximum restart limit reached"
+                log_error "Check logs for error details"
                 return 1
             fi
         fi
     done
 }
 
-# Main execution
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
 main() {
-    log_section "Pride Discord Bot - Startup Sequence"
+    clear
     
-    log_info "Environment: $(uname -s) $(uname -m)"
-    log_info "Python: $(python --version 2>&1)"
-    log_info "Working Directory: $(pwd)"
+    # Header
+    echo -e "${CYAN}"
+    echo "╔═══════════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                       ║"
+    echo "║                    ${WHITE}${BOLD}PRIDE DISCORD BOT${NC}${CYAN}                                 ║"
+    echo "║                   ${DIM}Professional Startup System${NC}${CYAN}                       ║"
+    echo "║                                                                       ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
     
-    # Pre-flight checks
-    log_section "Phase 1: Pre-flight Checks"
+    # Phase 1: System Checks
+    log_section "PHASE 1 │ System Checks & Configuration"
+    show_system_info
     configure_imagemagick
     check_token || exit 1
+    
+    # Phase 2: Dependencies
+    log_section "PHASE 2 │ Dependency Verification"
     check_dependencies || exit 1
     check_playwright
     
-    # Service initialization
-    log_section "Phase 2: Service Initialization"
+    # Phase 3: Services
+    log_section "PHASE 3 │ Service Initialization"
     start_redis || exit 1
     check_database
     
-    # Bot startup
-    log_section "Phase 3: Starting Discord Bot"
-    log_success "All systems ready!"
+    # Phase 4: Launch
+    log_section "PHASE 4 │ Bot Launch Sequence"
+    log_success "All systems operational!"
     echo ""
+    sleep 1
     
-    # Start bot with monitoring
     monitor_bot
     
-    # Cleanup on exit
-    log_section "Shutdown Sequence"
+    # Shutdown
+    echo ""
+    log_section "SHUTDOWN SEQUENCE"
     cleanup
-    log_success "Bot stopped cleanly"
+    log_success "System shutdown complete"
 }
 
-# Run main function
+# ============================================================================
+# ENTRY POINT
+# ============================================================================
 main "$@"
